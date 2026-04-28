@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A task delegated to a team member.",
+      "type": "object",
+      "properties": {
+        "area": { "type": "string" },
+        "task_type": { "type": "string" },
+        "task": { "type": "string" },
+        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "assignee": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"] },
+        "start_date": { "type": "string", "format": "date" },
+        "end_date": { "type": "string", "format": "date" },
+        "progress": { "type": "number" },
+        "frequency": { "type": "string", "enum": ["Once", "Daily", "Weekly", "Monthly"] },
+        "notes": { "type": "string" },
+        "flag": { "type": "string" },
+        "feedback": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["area", "task_type", "task", "priority", "assignee", "status", "progress", "frequency", "created_at", "updated_at"]
+    },
+    "Area": {
+      "title": "Area",
+      "description": "Functional department and its task types.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "task_types": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "task_types"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Team member for task assignment.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "AdminInfo": {
+      "title": "AdminInfo",
+      "description": "General application administrative information.",
+      "type": "object",
+      "properties": {
+        "developer_name": { "type": "string" },
+        "company_name": { "type": "string" },
+        "admin_email": { "type": "string", "format": "email" }
+      }
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Tasks created in the system."
+    },
+    "/areas/{areaId}": {
+      "schema": { "$ref": "#/entities/Area" },
+      "description": "Configurable areas and task types."
+    },
+    "/contacts/{contactId}": {
+      "schema": { "$ref": "#/entities/Contact" },
+      "description": "Configurable contacts list."
+    },
+    "/settings/admin": {
+      "schema": { "$ref": "#/entities/AdminInfo" },
+      "description": "Admin configuration."
+    }
+  }
+}

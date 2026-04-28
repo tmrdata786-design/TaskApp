@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['area', 'task_type', 'task', 'priority', 'assignee', 'status', 'progress', 'frequency', 'created_at', 'updated_at'])
+        && data.area is string && data.area.size() <= 100
+        && data.task_type is string && data.task_type.size() <= 100
+        && data.task is string && data.task.size() <= 1000
+        && data.priority in ['High', 'Medium', 'Low']
+        && data.assignee is string && data.assignee.size() <= 100
+        && data.status in ['Pending', 'In Progress', 'Completed']
+        && (data.progress is number || data.progress is int || data.progress is float)
+        && data.progress >= 0 && data.progress <= 1
+        && data.frequency in ['Once', 'Daily', 'Weekly', 'Monthly']
+        && data.get('notes', '') is string
+        && data.get('flag', '') is string
+        && data.get('feedback', '') is string
+        && data.get('start_date', '') is string
+        && data.get('end_date', '') is string;
+    }
+
+    match /tasks/{taskId} {
+      // In a real application, restrict to specific company users
+      // Here, we allow all signed-in users for simplicity
+      allow read: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isSignedIn()
+        && isValidId(taskId)
+        && isValidTask(incoming())
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time;
+      allow delete: if isSignedIn();
+    }
+
+    match /areas/{areaId} {
+      allow read, list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(areaId);
+    }
+
+    match /contacts/{contactId} {
+      allow read, list: if isSignedIn();
+      allow write: if isSignedIn() && isValidId(contactId);
+    }
+
+    match /settings/admin {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+  }
+}
