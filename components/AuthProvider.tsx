@@ -20,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -30,11 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async () => {
+    setError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Auth error", error);
+    } catch (e: any) {
+      console.error("Auth error", e);
+      if (e.code === 'auth/unauthorized-domain') {
+        setError("This domain is not authorized in Firebase Console. Please add 'task-app-three-phi.vercel.app' to Authorized Domains.");
+      } else if (e.code === 'auth/popup-blocked') {
+        setError("Sign-in popup was blocked by your browser. Please allow popups for this site.");
+      } else {
+        setError(e.message || "Sign-in failed. Please try again.");
+      }
     }
   };
 
@@ -54,7 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white shadow-lg bg-indigo-600 text-xl">TM</div>
           </div>
           <h2 className="text-2xl font-bold mb-2 text-white">Welcome</h2>
-          <p className="text-gray-400 mb-8">Sign in to access TM Rubber task tracking.</p>
+          <p className="text-gray-400 mb-6">Sign in to access TM Rubber task tracking.</p>
+          
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-lg mb-6 text-left">
+              {error}
+            </div>
+          )}
+
           <button 
             onClick={signIn}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl transition"
