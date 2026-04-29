@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from './firebase';
 
 export function useAdmin() {
@@ -7,8 +8,7 @@ export function useAdmin() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      const user = auth.currentUser;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user?.email) {
         setIsAdmin(false);
         setLoading(false);
@@ -42,9 +42,9 @@ export function useAdmin() {
       }
       
       setLoading(false);
-    };
+    });
 
-    checkAdmin();
+    return () => unsubscribe();
   }, []);
 
   return { isAdmin, loading };
