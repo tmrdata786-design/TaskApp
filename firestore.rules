@@ -12,6 +12,7 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == 'tmrdata786@gmail.com'; }
 
     function isValidTask(data) {
       return data.keys().hasAll(['area', 'task_type', 'task', 'priority', 'assignee', 'status', 'progress', 'frequency', 'created_at', 'updated_at'])
@@ -51,17 +52,17 @@ service cloud.firestore {
 
     match /areas/{areaId} {
       allow read, list: if isSignedIn();
-      allow write: if isSignedIn() && isValidId(areaId);
+      allow write: if isAdmin() && isValidId(areaId);
     }
 
     match /contacts/{contactId} {
       allow read, list: if isSignedIn();
-      allow write: if isSignedIn() && isValidId(contactId);
+      allow write: if isAdmin() && isValidId(contactId);
     }
 
     match /settings/admin {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

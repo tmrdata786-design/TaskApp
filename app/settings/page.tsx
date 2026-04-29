@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
-import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck } from 'lucide-react';
+import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'admin'>('areas');
   const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   
   // States for data
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
@@ -22,6 +23,16 @@ export default function SettingsPage() {
   const [contactEmail, setContactEmail] = useState('');
 
   useEffect(() => {
+    const checkAuth = () => {
+      const user = auth.currentUser;
+      if (user?.email === 'tmrdata786@gmail.com') {
+        setIsAuthorized(true);
+      } else {
+        setIsAuthorized(false);
+      }
+    };
+    checkAuth();
+
     // Listen to Areas
     const areasUnsub = onSnapshot(collection(db, 'areas'), (snap) => {
       setAreas(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
@@ -108,6 +119,22 @@ export default function SettingsPage() {
   };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <AlertTriangle size={48} className="text-amber-500" />
+        <h2 className="text-xl font-bold text-white">Access Denied</h2>
+        <p className="text-gray-400 text-center">Only authorized administrators can access this page.</p>
+        <button 
+          onClick={() => window.location.href = '/'}
+          className="bg-indigo-600 text-white px-6 py-2 rounded-xl"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-20 space-y-6">
