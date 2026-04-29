@@ -20,11 +20,54 @@ interface Task {
   end_date?: string;
 }
 
+function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: string, field: 'start_date'|'end_date', value?: string, isAdmin: boolean, onUpdate: (id: string, field: string, val: string) => void }) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing && isAdmin) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        defaultValue={value || ''}
+        className="bg-[#1A1D23] border border-indigo-500 rounded text-xs text-white px-1 py-0.5 outline-none inline-block w-auto"
+        onBlur={(e) => {
+          setEditing(false);
+          if (e.target.value !== value) {
+            onUpdate(taskId, field, e.target.value);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur();
+          } else if (e.key === 'Escape') {
+            setEditing(false);
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <span 
+      onDoubleClick={() => isAdmin && setEditing(true)} 
+      className={`cursor-pointer inline-block ${isAdmin ? 'hover:text-indigo-400' : ''}`}
+      title={isAdmin ? "Double click to edit" : ""}
+    >
+      {value || 'N/A'}
+    </span>
+  );
+}
+
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [view, setView] = useState<'list' | 'table' | 'kanban' | 'calendar' | 'gantt'>('list');
+
+  // Filters
+  const [areaFilter, setAreaFilter] = useState('All');
+  const [assigneeFilter, setAssigneeFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
     // 1. Fetch contacts so we know the user's name
@@ -110,6 +153,18 @@ export default function Dashboard() {
       handleFirestoreError(error, OperationType.UPDATE, `tasks/${id}`);
     }
   };
+
+  const updateDate = async (id: string, field: string, val: string) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'tasks', id), { 
+        [field]: val,
+        updated_at: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `tasks/${id}`);
+    }
+  };
   
   const deleteTask = async (id: string) => {
     if (!isAdmin) return;
@@ -128,6 +183,17 @@ export default function Dashboard() {
   const activeTasks = tasks.filter(t => t.status !== 'Completed').length;
   const completedTasks = tasks.filter(t => t.status === 'Completed').length;
   const highPriority = tasks.filter(t => t.priority === 'High' && t.status !== 'Completed').length;
+
+  const allAreas = Array.from(new Set(tasks.map(t => t.area))).filter(Boolean);
+  const allAssignees = Array.from(new Set(tasks.map(t => t.assignee))).filter(Boolean);
+  const allStatuses = ['Pending', 'In Progress', 'Completed'];
+
+  const filteredTasks = tasks.filter(t => {
+    if (areaFilter !== 'All' && t.area !== areaFilter) return false;
+    if (assigneeFilter !== 'All' && t.assignee !== assigneeFilter) return false;
+    if (statusFilter !== 'All' && t.status !== statusFilter) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6 pb-20">
@@ -158,20 +224,48 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <select 
+          value={areaFilter} 
+          onChange={(e) => setAreaFilter(e.target.value)}
+          className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+        >
+          <option value="All">All Areas</option>
+          {allAreas.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select 
+          value={assigneeFilter} 
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+        >
+          <option value="All">All Assignees</option>
+          {allAssignees.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select 
+          value={statusFilter} 
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+        >
+          <option value="All">All Statuses</option>
+          {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+
       <div className="bg-[#11141A] rounded-2xl border border-[#1F2937] flex flex-col overflow-hidden">
         <div className="p-4 border-b border-[#1F2937] flex items-center justify-between">
-          <h3 className="font-semibold text-white capitalize">{view} View</h3>
+          <h3 className="font-semibold text-white capitalize">{view} View <span className="ml-2 text-xs text-gray-500 bg-[#1A1D23] px-2 py-0.5 rounded-full">{filteredTasks.length} tasks</span></h3>
         </div>
         
-        {tasks.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-500">No tasks assigned yet.</p>
+            <p className="text-gray-500">No tasks match your filters.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
           {view === 'list' && (
             <div className="flex flex-col divide-y divide-[#1F2937]/50 min-w-[300px]">
-              {tasks.map((t) => (
+              {filteredTasks.map((t) => (
                 <div key={t.id} className="p-4 flex flex-col space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
@@ -188,6 +282,12 @@ export default function Dashboard() {
                       </div>
                       <h3 className="text-sm font-medium text-white leading-tight mt-1">{t.task}</h3>
                       <p className="text-xs font-medium text-gray-500 mt-1">Assignee: {t.assignee}</p>
+                      <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1">
+                        <CalendarDays size={12} className="inline mr-1"/>
+                        <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                        {' to '}
+                        <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                      </div>
                     </div>
                     
                     {isAdmin && (
@@ -241,33 +341,57 @@ export default function Dashboard() {
           )}
 
           {view === 'table' && (
-            <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
+            <table className="w-full text-left text-sm whitespace-nowrap min-w-[900px]">
               <thead className="bg-[#1A1D23] text-gray-400 border-b border-[#1F2937]">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Task</th>
-                  <th className="px-4 py-3 font-medium">Area</th>
-                  <th className="px-4 py-3 font-medium">Assignee</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Progress</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Task</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Area</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Assignee</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Dates</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Status</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Progress</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F2937]/50">
-                {tasks.map(t => (
+                {filteredTasks.map(t => (
                   <tr key={t.id} className="hover:bg-[#1A1D23]/50 transition">
                     <td className="px-4 py-3 truncate max-w-[200px] text-gray-200">{t.task}</td>
                     <td className="px-4 py-3 text-gray-400">{t.area}</td>
                     <td className="px-4 py-3 text-gray-400">{t.assignee}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                      {' - '}
+                      <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                    </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs inline-flex items-center gap-1 border ${
+                      <button 
+                        onClick={() => updateStatus(t.id, t.status)}
+                        disabled={!isAdmin}
+                        className={`px-2 py-1 rounded text-xs inline-flex items-center gap-1 border disabled:cursor-not-allowed ${
                         t.status === 'Completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                         t.status === 'In Progress' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
                         'bg-gray-500/10 text-gray-400 border-gray-500/20'
-                      }`}>
+                        }`}
+                      >
                         {t.status === 'Completed' ? <CheckCircle size={12} /> : <Clock size={12} />}
                         {t.status}
-                      </span>
+                      </button>
                     </td>
-                    <td className="px-4 py-3 text-gray-400">{Math.round(t.progress * 100)}%</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center space-x-2 w-24">
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100" 
+                          step="10" 
+                          value={t.progress * 100}
+                          onChange={(e) => updateProgress(t.id, e.target.value)}
+                          disabled={!isAdmin}
+                          className="w-full h-1.5 bg-[#2D3139] rounded appearance-none cursor-pointer accent-indigo-500 block disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <span className="text-xs text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -277,7 +401,7 @@ export default function Dashboard() {
           {view === 'kanban' && (
             <div className="flex space-x-4 p-4 min-w-[800px] overflow-x-auto bg-[#0B0D10]/50">
               {['Pending', 'In Progress', 'Completed'].map(status => {
-                const columnTasks = tasks.filter(t => t.status === status);
+                const columnTasks = filteredTasks.filter(t => t.status === status);
                 return (
                   <div key={status} className="flex-1 bg-[#11141A] rounded-xl border border-[#1F2937] p-3 flex flex-col min-w-[250px]">
                     <div className="flex items-center justify-between mb-4 px-1">
@@ -286,18 +410,34 @@ export default function Dashboard() {
                     </div>
                     <div className="space-y-3 flex-1">
                       {columnTasks.map(t => (
-                        <div key={t.id} className="bg-[#1A1D23] p-3 rounded-lg border border-[#2D3139] space-y-2 cursor-pointer hover:border-indigo-500/50 transition">
+                        <div key={t.id} className="bg-[#1A1D23] p-3 rounded-lg border border-[#2D3139] space-y-2 hover:border-indigo-500/50 transition relative group">
                           <div className="flex items-start justify-between gap-2">
-                            <h5 className="text-xs font-medium text-gray-200 line-clamp-2">{t.task}</h5>
+                            <h5 className="text-xs font-medium text-gray-200 line-clamp-2 pr-4">{t.task}</h5>
                             <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
                               t.priority === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
                               t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
                             }`}>{t.priority}</span>
                           </div>
+                          
+                          <div className="text-[10px] text-gray-500">
+                             <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                             {' - '}
+                             <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                          </div>
+
                           <div className="flex justify-between items-end text-gray-500">
                             <span className="text-[10px] bg-[#0B0D10] px-1.5 py-0.5 rounded">{t.assignee}</span>
                             <span className="text-[10px] font-medium">{Math.round(t.progress * 100)}%</span>
                           </div>
+                          {isAdmin && (
+                            <button 
+                              onClick={() => updateStatus(t.id, status)}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition p-1 bg-[#2D3139] hover:bg-indigo-600 rounded text-white"
+                              title="Update Status"
+                            >
+                              <CheckCircle size={12} />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -309,19 +449,23 @@ export default function Dashboard() {
 
           {view === 'calendar' && (
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 min-w-[300px]">
-              {tasks.filter(t => t.start_date || t.end_date).map(t => (
+              {filteredTasks.filter(t => t.start_date || t.end_date).map(t => (
                 <div key={t.id} className="bg-[#1A1D23] p-3 rounded-xl border border-[#2D3139]">
-                  <div className="flex items-center gap-2 mb-2 text-indigo-400">
+                  <div className="flex items-center gap-2 mb-2 text-indigo-400 text-xs">
                     <CalendarDays size={14} />
-                    <span className="text-xs font-medium">{t.start_date || 'N/A'} - {t.end_date || 'N/A'}</span>
+                    <span>
+                      <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                      {' - '}
+                      <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                    </span>
                   </div>
                   <h5 className="text-sm font-medium text-gray-200 truncate">{t.task}</h5>
                   <p className="text-xs text-gray-500 mt-1">{t.status}</p>
                 </div>
               ))}
-              {tasks.filter(t => !t.start_date && !t.end_date).length > 0 && (
+              {filteredTasks.filter(t => !t.start_date && !t.end_date).length > 0 && (
                 <div className="col-span-full p-3 pt-4 border-t border-[#1F2937] mt-2">
-                   <p className="text-xs text-gray-500">Plus {tasks.filter(t => !t.start_date && !t.end_date).length} tasks with no dates scheduled.</p>
+                   <p className="text-xs text-gray-500">Plus {filteredTasks.filter(t => !t.start_date && !t.end_date).length} tasks with no dates scheduled.</p>
                 </div>
               )}
             </div>
@@ -330,7 +474,7 @@ export default function Dashboard() {
           {view === 'gantt' && (
             <div className="p-4 overflow-x-auto min-w-[600px]">
               <div className="flex flex-col space-y-2 border-l border-b border-[#1F2937] pb-4 pl-4 relative">
-                {tasks.map(t => {
+                {filteredTasks.map(t => {
                   if (!t.start_date || !t.end_date) return null;
                   
                   const start = new Date(t.start_date).getTime();
@@ -345,8 +489,10 @@ export default function Dashboard() {
                       <div className="w-32 text-xs text-gray-400 truncate text-right">{t.task}</div>
                       <div className="h-6 bg-indigo-600/20 border border-indigo-500/50 rounded flex items-center px-2 relative" style={{ width: `${width}px` }}>
                         <div className="absolute top-0 left-0 bottom-0 bg-indigo-600/40" style={{ width: `${t.progress * 100}%` }} />
-                        <span className="text-[9px] text-white whitespace-nowrap z-10 shrink-0 select-none">
-                          {t.start_date}
+                        <span className="text-[9px] text-white whitespace-nowrap z-10 shrink-0 select-none cursor-pointer">
+                           <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
+                           {' - '}
+                           <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
                         </span>
                       </div>
                     </div>
