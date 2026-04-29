@@ -26,7 +26,6 @@ export default function AdminEntry() {
     assignee: '',
     status: 'Pending',
     progress: 0,
-    frequency: 'Once',
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
     notes: '',
@@ -229,17 +228,6 @@ export default function AdminEntry() {
               className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-white"
             />
           </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Frequency</label>
-          <select 
-            value={form.frequency}
-            onChange={e => handleUpdate('frequency', e.target.value)}
-            className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-white"
-          >
-            {['Once', 'Daily', 'Weekly', 'Monthly'].map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
         </div>
 
         <button 

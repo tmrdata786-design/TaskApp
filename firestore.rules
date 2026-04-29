@@ -21,7 +21,7 @@ service cloud.firestore {
     }
 
     function isValidTask(data) {
-      return data.keys().hasAll(['area', 'task_type', 'task', 'priority', 'assignee', 'status', 'progress', 'frequency', 'created_at', 'updated_at'])
+      return data.keys().hasAll(['area', 'task_type', 'task', 'priority', 'assignee', 'status', 'progress', 'created_at', 'updated_at'])
         && data.area is string && data.area.size() <= 100
         && data.task_type is string && data.task_type.size() <= 100
         && data.task is string && data.task.size() <= 1000
@@ -30,7 +30,6 @@ service cloud.firestore {
         && data.status in ['Pending', 'In Progress', 'Completed']
         && (data.progress is number || data.progress is int || data.progress is float)
         && data.progress >= 0 && data.progress <= 1
-        && data.frequency in ['Once', 'Daily', 'Weekly', 'Monthly']
         && data.get('notes', '') is string
         && data.get('flag', '') is string
         && data.get('feedback', '') is string
