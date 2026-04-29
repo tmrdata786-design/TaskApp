@@ -4,17 +4,19 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
-import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useAdmin } from '../../lib/useAdmin';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'admin'>('areas');
-  const [loading, setLoading] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  
+  const { isAdmin: isAuthorized, loading: adminLoading } = useAdmin();
   
   // States for data
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string }[]>([]);
-  const [admin, setAdmin] = useState({ developer_name: 'Umar Latif', company_name: 'TM Rubber', admin_email: '' });
+  const [admin, setAdmin] = useState<any>({ developer_name: 'Umar Latif', company_name: 'TM Rubber', admin_email: '', admin_emails: [] });
 
   // Form states
   const [newArea, setNewArea] = useState('');
@@ -23,16 +25,6 @@ export default function SettingsPage() {
   const [contactEmail, setContactEmail] = useState('');
 
   useEffect(() => {
-    const checkAuth = () => {
-      const user = auth.currentUser;
-      if (user?.email === 'tmrdata786@gmail.com') {
-        setIsAuthorized(true);
-      } else {
-        setIsAuthorized(false);
-      }
-    };
-    checkAuth();
-
     // Listen to Areas
     const areasUnsub = onSnapshot(collection(db, 'areas'), (snap) => {
       setAreas(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
@@ -48,7 +40,7 @@ export default function SettingsPage() {
       if (snap.exists()) {
         setAdmin(snap.data() as any);
       }
-    }).finally(() => setLoading(false));
+    }).finally(() => setLoadingConfig(false));
 
     return () => {
       areasUnsub();
@@ -56,10 +48,13 @@ export default function SettingsPage() {
     };
   }, []);
 
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   const saveAdmin = async () => {
     try {
       await setDoc(doc(db, 'settings', 'admin'), admin);
-      alert('Admin settings saved!');
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'settings/admin');
     }
@@ -118,7 +113,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
+  if (loadingConfig || adminLoading) return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
 
   if (!isAuthorized) {
     return (
@@ -315,23 +310,28 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Admin Email</label>
-                <input 
-                  type="email"
-                  value={admin.admin_email}
-                  onChange={e => setAdmin({ ...admin, admin_email: e.target.value })}
-                  placeholder="admin@example.com"
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Admin Emails (comma separated)</label>
+                <textarea 
+                  value={(admin as any).admin_emails ? (admin as any).admin_emails.join(', ') : admin.admin_email}
+                  onChange={e => setAdmin({ ...admin, admin_emails: e.target.value.split(',').map(s => s.trim()) })}
+                  placeholder="admin@example.com, user2@example.com"
                   className="w-full px-4 py-3 bg-[#0B0D10] border border-[#1F2937] rounded-xl text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
+                  rows={3}
                 />
               </div>
             </div>
 
             <button 
               onClick={saveAdmin}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-lg flex items-center justify-center gap-2"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-lg flex items-center justify-center gap-2 relative overflow-hidden"
             >
               <Save size={20} /> Save Admin Settings
             </button>
+            {saveSuccess && (
+              <div className="absolute bottom-4 right-4 bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-medium animate-in slide-in-from-bottom flex items-center gap-2">
+                 <CheckCircle size={16} /> Settings saved successfully!
+              </div>
+            )}
           </div>
         </div>
       )}

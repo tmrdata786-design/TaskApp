@@ -12,7 +12,13 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && request.auth.token.email == 'tmrdata786@gmail.com'; }
+    function getAdminEmails() {
+      let doc = get(/databases/$(database)/documents/settings/admin);
+      return doc != null && 'admin_emails' in doc.data ? doc.data.admin_emails : [];
+    }
+    function isAdmin() { 
+      return isSignedIn() && (request.auth.token.email == 'tmrdata786@gmail.com' || request.auth.token.email in getAdminEmails()); 
+    }
 
     function isValidTask(data) {
       return data.keys().hasAll(['area', 'task_type', 'task', 'priority', 'assignee', 'status', 'progress', 'frequency', 'created_at', 'updated_at'])

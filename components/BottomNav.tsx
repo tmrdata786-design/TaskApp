@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, PlusCircle, Settings } from 'lucide-react';
-import { auth } from '../lib/firebase';
+import { useAdmin } from '../lib/useAdmin';
 
 export function BottomNav() {
   const pathname = usePathname();
-  const isAdmin = auth.currentUser?.email === 'tmrdata786@gmail.com';
+  const { isAdmin } = useAdmin();
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-[#0B0D10] border-t border-[#1F2937] flex justify-around items-center h-16 pb-safe z-50">

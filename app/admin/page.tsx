@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertTriangle } from 'lucide-react';
+import { useAdmin } from '../../lib/useAdmin';
 
 export default function AdminEntry() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const { isAdmin: isAuthorized, loading: adminLoading } = useAdmin();
+  const [loadingConfig, setLoadingConfig] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -34,16 +35,6 @@ export default function AdminEntry() {
   });
 
   useEffect(() => {
-    const checkAuth = () => {
-      const user = auth.currentUser;
-      if (user?.email === 'tmrdata786@gmail.com') {
-        setIsAuthorized(true);
-      } else {
-        setIsAuthorized(false);
-      }
-    };
-    checkAuth();
-
     async function initData() {
       try {
         const areaSnap = await getDocs(collection(db, 'areas'));
@@ -80,7 +71,7 @@ export default function AdminEntry() {
       } catch (e) {
         handleFirestoreError(e, OperationType.LIST, 'config');
       } finally {
-        setLoading(false);
+        setLoadingConfig(false);
       }
     }
     initData();
@@ -113,7 +104,7 @@ export default function AdminEntry() {
     try {
       const tasksRef = collection(db, 'tasks');
       const newDoc = doc(tasksRef);
-      const now = new Date().toISOString();
+      const now = serverTimestamp();
       await setDoc(newDoc, {
         ...form,
         created_at: now,
@@ -128,7 +119,7 @@ export default function AdminEntry() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Loading configurations...</div>;
+  if (loadingConfig || adminLoading) return <div className="p-8 text-center text-gray-500">Loading configurations...</div>;
 
   if (!isAuthorized) {
     return (
