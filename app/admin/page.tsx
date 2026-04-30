@@ -17,10 +17,12 @@ export default function AdminEntry() {
 
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const [form, setForm] = useState({
     area: '',
     task_type: '',
+    project: '',
     task: '',
     priority: 'High',
     assignee: '',
@@ -58,6 +60,9 @@ export default function AdminEntry() {
 
         const contactSnap = await getDocs(collection(db, 'contacts'));
         setContacts(contactSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+        
+        const projectSnap = await getDocs(collection(db, 'projects'));
+        setProjects(projectSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
 
         // Set defaults
         if (areaList.length > 0) {
@@ -173,17 +178,18 @@ export default function AdminEntry() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Task Description</label>
-          <textarea 
-            value={form.task}
-            onChange={e => handleUpdate('task', e.target.value)}
-            className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition min-h-[100px] text-white placeholder-gray-600"
-            placeholder="Describe the task clearly..."
-          />
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Project</label>
+            <select 
+              value={form.project} 
+              onChange={e => handleUpdate('project', e.target.value)}
+              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-white"
+            >
+              <option value="">No Project</option>
+              {projects.map(p => <option key={p.id} value={p.name}>{p.id} - {p.name}</option>)}
+            </select>
+          </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Assignee</label>
             <select 
@@ -195,7 +201,20 @@ export default function AdminEntry() {
               {contacts.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
-          <div className="space-y-1.5">
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Task Description</label>
+          <textarea 
+            value={form.task}
+            onChange={e => handleUpdate('task', e.target.value)}
+            className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition min-h-[100px] text-white placeholder-gray-600"
+            placeholder="Describe the task clearly..."
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-1.5 min-w-0">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Priority</label>
             <select 
               value={form.priority}
@@ -207,10 +226,7 @@ export default function AdminEntry() {
               <option value="Low">Low</option>
             </select>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Start Date</label>
             <input 
               type="date"
@@ -219,7 +235,7 @@ export default function AdminEntry() {
               className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-white"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">End Date</label>
             <input 
               type="date"

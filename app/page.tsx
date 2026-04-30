@@ -4,13 +4,16 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestoreError';
-import { CheckCircle, Clock, Trash2, LayoutList, Table2, KanbanSquare, CalendarDays, BarChartHorizontal } from 'lucide-react';
+import { CheckCircle, Clock, Trash2, LayoutList, Table2, KanbanSquare, CalendarDays, BarChartHorizontal, MessageSquare, Edit } from 'lucide-react';
 import { useAdmin } from '../lib/useAdmin';
+import EditTaskModal from '../components/EditTaskModal';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface Task {
   id: string;
   area: string;
   task_type: string;
+  project?: string;
   task: string;
   priority: string;
   assignee: string;
@@ -21,46 +24,47 @@ interface Task {
 }
 
 function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: string, field: 'start_date'|'end_date', value?: string, isAdmin: boolean, onUpdate: (id: string, field: string, val: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    if (isAdmin && inputRef.current) {
-      e.stopPropagation();
-      e.preventDefault();
-      try {
-        if (typeof inputRef.current.showPicker === 'function') {
-          inputRef.current.showPicker();
-        }
-      } catch (err) {
-        // Fallback for browsers without showPicker
-      }
-    }
-  };
+  if (editing && isAdmin) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        defaultValue={value || ''}
+        className="bg-[#1A1D23] border border-indigo-500 rounded text-xs text-white px-1 py-0.5 outline-none inline-block w-auto"
+        onBlur={(e) => {
+          setEditing(false);
+          if (e.target.value !== value) {
+            onUpdate(taskId, field, e.target.value);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.currentTarget.blur();
+          } else if (e.key === 'Escape') {
+            setEditing(false);
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
 
   return (
-    <div className="relative inline-flex items-center">
-      <span 
-        onDoubleClick={handleDoubleClick}
-        className={`cursor-pointer select-none ${isAdmin ? 'hover:text-indigo-400' : ''}`}
-        title={isAdmin ? "Double click to edit" : ""}
-      >
-        {value || 'N/A'}
-      </span>
-      {isAdmin && (
-        <input
-          ref={inputRef}
-          tabIndex={-1}
-          type="date"
-          value={value || ''}
-          onChange={(e) => {
-            if (e.target.value !== value) {
-              onUpdate(taskId, field, e.target.value);
-            }
-          }}
-          className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none -z-10 border-0 p-0"
-        />
-      )}
-    </div>
+    <span 
+      onDoubleClick={(e) => {
+        if (isAdmin) {
+          e.stopPropagation();
+          e.preventDefault();
+          setEditing(true);
+        }
+      }} 
+      className={`cursor-pointer inline-block select-none ${isAdmin ? 'hover:text-indigo-400' : ''}`}
+      title={isAdmin ? "Double click to edit" : ""}
+    >
+      {value || 'N/A'}
+    </span>
   );
 }
 
@@ -69,9 +73,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [view, setView] = useState<'list' | 'table' | 'kanban' | 'calendar' | 'gantt'>('list');
+  const [activeFeedbackTask, setActiveFeedbackTask] = useState<Task | null>(null);
+  const [activeEditTask, setActiveEditTask] = useState<Task | null>(null);
 
   // Filters
   const [areaFilter, setAreaFilter] = useState('All');
+  const [projectFilter, setProjectFilter] = useState('All');
   const [assigneeFilter, setAssigneeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
@@ -195,6 +202,7 @@ export default function Dashboard() {
   const highPriority = tasks.filter(t => t.priority === 'High' && t.status !== 'Completed').length;
 
   const allAreas = Array.from(new Set(tasks.map(t => t.area))).filter(Boolean);
+  const allProjects = Array.from(new Set(tasks.map(t => t.project))).filter(Boolean);
   const allAssignees = Array.from(new Set(tasks.map(t => t.assignee))).filter(Boolean);
   const allStatuses = ['Pending', 'In Progress', 'Completed'];
   const allPriorities = ['High', 'Medium', 'Low'];
@@ -202,6 +210,7 @@ export default function Dashboard() {
 
   const filteredTasks = tasks.filter(t => {
     if (areaFilter !== 'All' && t.area !== areaFilter) return false;
+    if (projectFilter !== 'All' && t.project !== projectFilter) return false;
     if (assigneeFilter !== 'All' && t.assignee !== assigneeFilter) return false;
     if (statusFilter !== 'All' && t.status !== statusFilter) return false;
     if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
@@ -252,6 +261,14 @@ export default function Dashboard() {
             {allAreas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
           <select 
+            value={projectFilter} 
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+          >
+            <option value="All">All Projects</option>
+            {allProjects.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select 
             value={assigneeFilter} 
             onChange={(e) => setAssigneeFilter(e.target.value)}
             className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
@@ -290,7 +307,10 @@ export default function Dashboard() {
             type="date"
             value={startDateFilter}
             onChange={(e) => setStartDateFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition"
+            onClick={(e) => {
+              try { e.currentTarget.showPicker(); } catch(err) {} 
+            }}
+            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
             title="Start Date (From)"
           />
           <span className="text-gray-500 text-sm">to</span>
@@ -298,7 +318,10 @@ export default function Dashboard() {
             type="date"
             value={endDateFilter}
             onChange={(e) => setEndDateFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition"
+            onClick={(e) => {
+              try { e.currentTarget.showPicker(); } catch(err) {} 
+            }}
+            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
             title="End Date (To)"
           />
           {(startDateFilter || endDateFilter) && (
@@ -329,10 +352,15 @@ export default function Dashboard() {
                 <div key={t.id} className="p-4 flex flex-col space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="flex items-center space-x-2 mb-1">
+                      <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
                         <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/20">
                           {t.area}
                         </span>
+                        {t.project && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">
+                            {t.project}
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
                           t.priority === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
                           t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
@@ -350,15 +378,35 @@ export default function Dashboard() {
                       </div>
                     </div>
                     
-                    {isAdmin && (
+                    <div className="flex items-center space-x-1">
                       <button 
-                        onClick={() => deleteTask(t.id)}
-                        className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-[#1A1D23] transition"
-                        title="Delete task"
+                        onClick={() => setActiveFeedbackTask(t)}
+                        className="p-1.5 text-gray-400 hover:text-indigo-400 rounded-lg hover:bg-[#1A1D23] transition flex items-center"
+                        title="Feedback"
                       >
-                        <Trash2 size={16} />
+                        <MessageSquare size={16} />
                       </button>
-                    )}
+                      
+                      {isAdmin && (
+                        <button 
+                          onClick={() => setActiveEditTask(t)}
+                          className="p-1.5 text-gray-500 hover:text-indigo-400 rounded-lg hover:bg-[#1A1D23] transition"
+                          title="Edit Task"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      )}
+                      
+                      {isAdmin && (
+                        <button 
+                          onClick={() => deleteTask(t.id)}
+                          className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-[#1A1D23] transition"
+                          title="Delete task"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 items-center">
@@ -405,17 +453,20 @@ export default function Dashboard() {
               <thead className="bg-[#1A1D23] text-gray-400 border-b border-[#1F2937]">
                 <tr>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Task</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Project</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Area</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Assignee</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Dates</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Status</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Progress</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F2937]/50">
                 {filteredTasks.map(t => (
                   <tr key={t.id} className="hover:bg-[#1A1D23]/50 transition">
                     <td className="px-4 py-3 truncate max-w-[200px] text-gray-200">{t.task}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{t.project || '-'}</td>
                     <td className="px-4 py-3 text-gray-400">{t.area}</td>
                     <td className="px-4 py-3 text-gray-400">{t.assignee}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
@@ -452,6 +503,23 @@ export default function Dashboard() {
                         <span className="text-xs text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center space-x-1">
+                        <button onClick={() => setActiveFeedbackTask(t)} className="p-1 text-gray-400 hover:text-indigo-400 rounded transition" title="Feedback">
+                          <MessageSquare size={14} />
+                        </button>
+                        {isAdmin && (
+                          <button onClick={() => setActiveEditTask(t)} className="p-1 text-gray-500 hover:text-indigo-400 rounded transition" title="Edit Task">
+                            <Edit size={14} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button onClick={() => deleteTask(t.id)} className="p-1 text-gray-500 hover:text-red-400 rounded transition" title="Delete task">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -478,6 +546,10 @@ export default function Dashboard() {
                               t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
                             }`}>{t.priority}</span>
                           </div>
+                          
+                          {t.project && (
+                             <div className="text-[10px] text-emerald-400/80 font-medium">#{t.project}</div>
+                          )}
                           
                           <div className="text-[10px] text-gray-500">
                              <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
@@ -566,6 +638,21 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {activeEditTask && (
+        <EditTaskModal 
+          taskId={activeEditTask.id} 
+          onClose={() => setActiveEditTask(null)} 
+        />
+      )}
+      
+      {activeFeedbackTask && (
+        <FeedbackModal 
+          taskId={activeFeedbackTask.id} 
+          taskName={activeFeedbackTask.task} 
+          onClose={() => setActiveFeedbackTask(null)} 
+        />
+      )}
     </div>
   );
 }

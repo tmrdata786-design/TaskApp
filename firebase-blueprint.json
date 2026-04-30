@@ -7,6 +7,7 @@
       "properties": {
         "area": { "type": "string" },
         "task_type": { "type": "string" },
+        "project": { "type": "string" },
         "task": { "type": "string" },
         "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
         "assignee": { "type": "string" },
@@ -14,14 +15,35 @@
         "start_date": { "type": "string", "format": "date" },
         "end_date": { "type": "string", "format": "date" },
         "progress": { "type": "number" },
-        "frequency": { "type": "string", "enum": ["Once", "Daily", "Weekly", "Monthly"] },
         "notes": { "type": "string" },
         "flag": { "type": "string" },
         "feedback": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["area", "task_type", "task", "priority", "assignee", "status", "progress", "frequency", "created_at", "updated_at"]
+      "required": ["area", "task_type", "task", "priority", "assignee", "status", "progress", "created_at", "updated_at"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Project configuration.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "created_at"]
+    },
+    "TaskFeedback": {
+      "title": "TaskFeedback",
+      "description": "Feedback or chat messages for a specific task.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "user": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "user", "created_at"]
     },
     "Area": {
       "title": "Area",
@@ -58,6 +80,14 @@
     "/tasks/{taskId}": {
       "schema": { "$ref": "#/entities/Task" },
       "description": "Tasks created in the system."
+    },
+    "/tasks/{taskId}/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/TaskFeedback" },
+      "description": "Chat messages for a task"
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Configurable projects."
     },
     "/areas/{areaId}": {
       "schema": { "$ref": "#/entities/Area" },

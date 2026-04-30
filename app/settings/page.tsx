@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
-import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle, FolderKanban } from 'lucide-react';
 import { useAdmin } from '../../lib/useAdmin';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'admin'>('areas');
+  const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'projects' | 'admin'>('areas');
   const [loadingConfig, setLoadingConfig] = useState(true);
   
   const { isAdmin: isAuthorized, loading: adminLoading } = useAdmin();
@@ -16,6 +16,7 @@ export default function SettingsPage() {
   // States for data
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; description: string; created_at: string }[]>([]);
   const [admin, setAdmin] = useState<any>({ developer_name: 'Umar Latif', company_name: 'TM Rubber', admin_email: '', admin_emails: [] });
 
   // Form states
@@ -23,6 +24,8 @@ export default function SettingsPage() {
   const [newTaskType, setNewTaskType] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
 
   useEffect(() => {
     // Listen to Areas
@@ -35,6 +38,11 @@ export default function SettingsPage() {
       setContacts(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
     });
 
+    // Listen to Projects
+    const projectsUnsub = onSnapshot(collection(db, 'projects'), (snap) => {
+      setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+    });
+
     // Get Admin Settings
     getDoc(doc(db, 'settings', 'admin')).then((snap) => {
       if (snap.exists()) {
@@ -45,6 +53,7 @@ export default function SettingsPage() {
     return () => {
       areasUnsub();
       contactsUnsub();
+      projectsUnsub();
     };
   }, []);
 
@@ -113,6 +122,33 @@ export default function SettingsPage() {
     }
   };
 
+  const addProject = async () => {
+    if (!projectName.trim()) return;
+    try {
+      // Find max project number
+      let maxNum = 0;
+      projects.forEach(p => {
+        const match = p.id.match(/^Project-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > maxNum) maxNum = num;
+        }
+      });
+      const nextNum = maxNum + 1;
+      const nextId = `Project-${nextNum.toString().padStart(5, '0')}`;
+      
+      await setDoc(doc(db, 'projects', nextId), { 
+        name: projectName, 
+        description: projectDescription,
+        created_at: new Date().toISOString()
+      });
+      setProjectName('');
+      setProjectDescription('');
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'projects');
+    }
+  };
+
   if (loadingConfig || adminLoading) return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
 
   if (!isAuthorized) {
@@ -148,6 +184,12 @@ export default function SettingsPage() {
           className={`flex-1 py-2 text-xs font-medium rounded-lg transition ${activeTab === 'contacts' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
         >
           Contacts
+        </button>
+        <button 
+          onClick={() => setActiveTab('projects')}
+          className={`flex-1 py-2 text-xs font-medium rounded-lg transition ${activeTab === 'projects' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          Projects
         </button>
         <button 
           onClick={() => setActiveTab('admin')}
@@ -278,6 +320,65 @@ export default function SettingsPage() {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Projects */}
+      {activeTab === 'projects' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="bg-[#11141A] p-5 rounded-2xl border border-[#1F2937] space-y-4">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <FolderKanban size={16} className="text-indigo-400" /> New Project
+            </h3>
+            <div className="space-y-3">
+              <input 
+                type="text" 
+                value={projectName}
+                onChange={e => setProjectName(e.target.value)}
+                placeholder="Project Name"
+                className="w-full px-4 py-2 bg-[#0B0D10] border border-[#1F2937] rounded-xl text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+              />
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={projectDescription}
+                  onChange={e => setProjectDescription(e.target.value)}
+                  placeholder="Description (optional)"
+                  className="flex-1 px-4 py-2 bg-[#0B0D10] border border-[#1F2937] rounded-xl text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                />
+                <button 
+                  onClick={addProject}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition flex items-center shrink-0"
+                >
+                  <Plus size={20} className="mr-1" /> Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#11141A] rounded-2xl border border-[#1F2937] divide-y divide-[#1F2937]">
+            {projects.map(p => (
+              <div key={p.id} className="p-4 flex justify-between items-center bg-[#1A1D23]/30 hover:bg-[#1A1D23]/50 transition">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">{p.id}</span>
+                    <h4 className="text-sm font-medium text-white">{p.name}</h4>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-2">{p.description || 'No description'}</p>
+                </div>
+                <button 
+                  onClick={() => deleteDoc(doc(db, 'projects', p.id))}
+                  className="p-2 text-gray-600 hover:text-red-500 transition ml-4 shrink-0"
+                  title="Delete Project"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {projects.length === 0 && (
+               <div className="p-8 text-center text-gray-500">No projects created yet.</div>
+            )}
           </div>
         </div>
       )}

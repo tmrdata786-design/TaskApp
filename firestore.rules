@@ -20,6 +20,12 @@ service cloud.firestore {
       return isSignedIn() && (request.auth.token.email == 'tmrdata786@gmail.com' || request.auth.token.email in getAdminEmails()); 
     }
 
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'description', 'created_at'])
+        && data.name is string && data.name.size() <= 100
+        && data.description is string && data.description.size() <= 1000;
+    }
+
     function isValidTask(data) {
       return data.keys().hasAll(['area', 'task_type', 'task', 'priority', 'assignee', 'status', 'progress', 'created_at', 'updated_at'])
         && data.area is string && data.area.size() <= 100
@@ -30,11 +36,19 @@ service cloud.firestore {
         && data.status in ['Pending', 'In Progress', 'Completed']
         && (data.progress is number || data.progress is int || data.progress is float)
         && data.progress >= 0 && data.progress <= 1
+        && data.get('project', '') is string
         && data.get('notes', '') is string
         && data.get('flag', '') is string
         && data.get('feedback', '') is string
         && data.get('start_date', '') is string
         && data.get('end_date', '') is string;
+    }
+
+    function isValidTaskFeedback(data) {
+      return data.keys().hasAll(['text', 'user', 'created_at'])
+        && data.text is string && data.text.size() > 0 && data.text.size() <= 2000
+        && data.user is string && data.user.size() > 0 && data.user.size() <= 100
+        && data.created_at is string; // Let's simplify ISO string logic for now
     }
 
     match /tasks/{taskId} {
@@ -53,11 +67,23 @@ service cloud.firestore {
         && incoming().created_at == existing().created_at
         && incoming().updated_at == request.time;
       allow delete: if isSignedIn();
+      
+      match /feedback/{feedbackId} {
+        allow read, list: if isSignedIn();
+        allow create: if isSignedIn() && isValidTaskFeedback(incoming()) && isValidId(feedbackId);
+        allow update, delete: if isAdmin() && isValidId(feedbackId);
+      }
     }
 
     match /areas/{areaId} {
       allow read, list: if isSignedIn();
       allow write: if isAdmin() && isValidId(areaId);
+    }
+
+    match /projects/{projectId} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(projectId) && isValidProject(incoming());
+      allow delete: if isAdmin() && isValidId(projectId);
     }
 
     match /contacts/{contactId} {
