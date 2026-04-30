@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { format, addDays, differenceInDays, startOfDay, isBefore, isAfter } from 'date-fns';
+import { useMemo, useState } from 'react';
+import { format, addDays, differenceInDays, startOfDay, isBefore, isAfter, startOfWeek, startOfMonth } from 'date-fns';
 
 interface GanttTask {
   id: string;
@@ -19,7 +19,11 @@ const colorMap: Record<string, string> = {
   Low: 'bg-blue-500 text-blue-500 dark:text-blue-400'
 };
 
+type ViewMode = 'Day' | 'Week' | 'Month';
+
 export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('Week');
+
   const { parsedTasks, minDate, maxDate, totalDays } = useMemo(() => {
     const valid = tasks.filter(t => t.start_date && t.end_date).map(t => ({
       id: t.id,
@@ -43,8 +47,7 @@ export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
       if (isBefore(v.end, minD)) minD = v.end;
     });
 
-    // Add some padding to maxD
-    maxD = addDays(maxD, 2);
+    maxD = addDays(maxD, Math.max(7, Math.floor((differenceInDays(maxD, minD))*0.1)));
 
     const tDays = Math.max(1, differenceInDays(maxD, minD) + 1);
 
@@ -56,55 +59,103 @@ export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
   }
 
   const dateLabels = [];
-  for (let i = 0; i < totalDays; i += 2) {
-    dateLabels.push({ day: i, label: format(addDays(minDate, i), 'MMM d') });
+  if (viewMode === 'Day') {
+    for (let i = 0; i <= totalDays; i += 2) {
+      dateLabels.push({ day: i, label: format(addDays(minDate, i), 'MMM d') });
+    }
+  } else if (viewMode === 'Week') {
+    let currentWeek = startOfWeek(minDate);
+    while (differenceInDays(currentWeek, minDate) <= totalDays) {
+      const dayOffset = differenceInDays(currentWeek, minDate);
+      if (dayOffset >= 0) {
+        dateLabels.push({ day: dayOffset, label: format(currentWeek, 'MMM d') });
+      }
+      currentWeek = addDays(currentWeek, 7);
+    }
+  } else {
+    let currentMonth = startOfMonth(minDate);
+    while (differenceInDays(currentMonth, minDate) <= totalDays) {
+      const dayOffset = differenceInDays(currentMonth, minDate);
+      if (dayOffset >= 0) {
+        dateLabels.push({ day: Math.max(0, dayOffset), label: format(currentMonth, 'MMM yyyy') });
+      }
+      currentMonth = addDays(currentMonth, 31);
+      currentMonth = startOfMonth(currentMonth); // force start of next month safely
+    }
   }
 
-  return (
-    <div className="bg-white dark:bg-[#11141A] rounded-xl border border-gray-200 dark:border-[#1F2937] overflow-x-auto">
-      <div className="min-w-[800px] flex">
-        {/* Left column for names */}
-        <div className="w-1/4 shrink-0 border-r border-gray-200 dark:border-[#1F2937] flex flex-col pt-8">
-          {parsedTasks.map(t => (
-            <div key={t.id} className="h-10 flex items-center px-4 border-b border-gray-100 dark:border-[#1F2937]/50 truncate text-xs">
-              <span className={t.color.split(' ')[1]}>{t.name}</span>
-            </div>
-          ))}
-          {/* Axis spacer */}
-          <div className="h-10 border-t border-gray-200 dark:border-[#1F2937]"></div>
-        </div>
-        
-        {/* Right timeline */}
-        <div className="flex-1 relative pb-10">
-          <div className="pt-8 flex flex-col">
-            {parsedTasks.map(t => {
-              const startOffset = differenceInDays(t.start, minDate);
-              const duration = Math.max(1, differenceInDays(t.end, t.start) + 1);
-              const leftPercent = (startOffset / totalDays) * 100;
-              const widthPercent = (duration / totalDays) * 100;
-              
-              return (
-                <div key={t.id} className="h-10 relative border-b border-gray-100 dark:border-[#1F2937]/50">
-                  <div 
-                    className={`absolute top-2 bottom-2 rounded-md ${t.color.split(' ')[0]}`}
-                    style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
-                  />
-                </div>
-              );
-            })}
-          </div>
+  const timelineWidth = viewMode === 'Day' 
+    ? Math.max(800, totalDays * 60)
+    : viewMode === 'Week' 
+      ? Math.max(800, totalDays * 15)
+      : Math.max(800, totalDays * 5);
 
-          {/* Time Axis */}
-          <div className="absolute bottom-0 left-0 right-0 h-10 border-t border-gray-200 dark:border-[#1F2937] flex items-center">
-            {dateLabels.map((d) => (
-              <div 
-                key={d.day} 
-                className="absolute text-xs text-gray-700 dark:text-gray-300 font-medium"
-                style={{ left: `${(d.day / totalDays) * 100}%`, transform: 'translateX(-50%)' }}
-              >
-                {d.label}
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex bg-gray-100 dark:bg-[#1A1D23] p-1 rounded-xl w-fit">
+        {['Day', 'Week', 'Month'].map(mode => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode as ViewMode)}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition ${
+              viewMode === mode 
+                ? 'bg-white dark:bg-[#2D3139] text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white dark:bg-[#11141A] rounded-xl border border-gray-200 dark:border-[#1F2937] overflow-x-auto">
+        <div style={{ minWidth: timelineWidth + 250 }} className="flex relative">
+          {/* Left column for names */}
+          <div className="w-[200px] shrink-0 border-r border-gray-200 dark:border-[#1F2937] flex flex-col pt-8 bg-white dark:bg-[#11141A] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+            {parsedTasks.map(t => (
+              <div key={t.id} className="h-10 flex items-center px-4 border-b border-gray-100 dark:border-[#1F2937]/50 truncate text-xs bg-white dark:bg-[#11141A]">
+                <span className={t.color.split(' ')[1]}>{t.name}</span>
               </div>
             ))}
+            {/* Axis spacer */}
+            <div className="h-10 border-t border-gray-200 dark:border-[#1F2937] bg-white dark:bg-[#11141A]"></div>
+          </div>
+          
+          {/* Right timeline */}
+          <div className="flex-1 relative pb-10">
+            <div className="pt-8 flex flex-col">
+              {parsedTasks.map(t => {
+                const startOffset = differenceInDays(t.start, minDate);
+                const duration = Math.max(1, differenceInDays(t.end, t.start) + 1);
+                const leftPercent = (startOffset / totalDays) * 100;
+                const widthPercent = (duration / totalDays) * 100;
+                
+                return (
+                  <div key={t.id} className="h-10 relative border-b border-gray-100 dark:border-[#1F2937]/50">
+                    <div 
+                      className={`absolute top-2 bottom-2 rounded-md ${t.color.split(' ')[0]}`}
+                      style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Time Axis */}
+            <div className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none">
+              {dateLabels.map((d, idx) => (
+                <div 
+                  key={idx} 
+                  className="absolute top-0 bottom-0 border-l border-gray-100 dark:border-[#1F2937]/30"
+                  style={{ left: `${(d.day / totalDays) * 100}%` }}
+                >
+                  <div className="absolute bottom-[2px] left-0 text-[10px] text-gray-500 px-1 font-medium transform -translate-x-1/2 whitespace-nowrap bg-white dark:bg-[#11141A]">
+                    {d.label}
+                  </div>
+                </div>
+              ))}
+              <div className="absolute bottom-10 left-0 right-0 border-t border-gray-200 dark:border-[#1F2937]"></div>
+            </div>
           </div>
         </div>
       </div>

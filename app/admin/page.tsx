@@ -202,7 +202,7 @@ export default function AdminEntry() {
               className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               <option value="">No Project</option>
-              {projects.map(p => <option key={p.id} value={p.name}>{p.id} - {p.name}</option>)}
+              {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">

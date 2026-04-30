@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
-import { Loader2, Plus, Trash2, Save, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle, FolderKanban } from 'lucide-react';
+import { Loader2, Plus, Trash2, Save, Edit, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle, FolderKanban } from 'lucide-react';
 import { useAdmin } from '../../lib/useAdmin';
 
 export default function SettingsPage() {
@@ -368,7 +368,7 @@ export default function SettingsPage() {
                     className="p-2 text-gray-400 hover:text-indigo-400 transition"
                     title="Edit Contact"
                   >
-                    <Save size={16} />
+                    <Edit size={16} />
                   </button>
                   <button 
                     onClick={() => deleteDoc(doc(db, 'contacts', c.id))}
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                     className="p-2 text-gray-400 hover:text-indigo-400 transition"
                     title="Edit Project"
                   >
-                    <Save size={16} />
+                    <Edit size={16} />
                   </button>
                   <button 
                     onClick={() => deleteDoc(doc(db, 'projects', p.id))}
@@ -524,7 +524,7 @@ export default function SettingsPage() {
                          </div>
                          <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                            <span className="font-semibold text-[10px] w-12 shrink-0">Phone:</span>
-                           <span>+92-321-8833616</span>
+                           <span>+92-300-4439445</span>
                          </div>
                        </div>
                     </div>

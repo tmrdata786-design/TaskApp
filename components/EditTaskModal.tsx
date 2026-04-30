@@ -119,7 +119,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
               <label className="text-xs font-medium text-gray-500">Project</label>
               <select value={form.project || ''} onChange={e => handleUpdate('project', e.target.value)} className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-gray-900 dark:text-white">
                 <option value="">No Project</option>
-                {projects.map(p => <option key={p.id} value={p.name}>{p.id} - {p.name}</option>)}
+                {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">

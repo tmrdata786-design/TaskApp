@@ -391,9 +391,11 @@ export default function Dashboard() {
                           {t.priority}
                         </span>
                       </div>
-                      <div className="text-[10px] text-indigo-400 font-bold mb-1">
-                        {t.id}
-                      </div>
+                      {t.id.startsWith('Task') && (
+                        <div className="text-[10px] text-indigo-400 font-bold mb-1">
+                          {t.id}
+                        </div>
+                      )}
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white leading-tight">{t.task}</h3>
                       <p className="text-xs font-medium text-gray-500 mt-1">Assignee: {t.assignee}</p>
                       <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1">
@@ -492,7 +494,7 @@ export default function Dashboard() {
                 {filteredTasks.map(t => (
                   <tr key={t.id} className="hover:bg-gray-50 dark:bg-[#1A1D23]/50 transition">
                     <td className="px-4 py-3 truncate max-w-[200px] text-gray-800 dark:text-gray-200">
-                      <div className="text-[10px] text-indigo-400 font-bold mb-0.5">{t.id}</div>
+                      {t.id.startsWith('Task') && <div className="text-[10px] text-indigo-400 font-bold mb-0.5">{t.id}</div>}
                       {t.task}
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{t.project || '-'}</td>
@@ -570,7 +572,7 @@ export default function Dashboard() {
                         <div key={t.id} className="bg-gray-50 dark:bg-[#1A1D23] p-3 rounded-lg border border-gray-300 dark:border-[#2D3139] space-y-2 hover:border-indigo-500/50 transition relative group">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 pr-4">
-                              <div className="text-[9px] text-indigo-400 font-bold mb-0.5">{t.id}</div>
+                              {t.id.startsWith('Task') && <div className="text-[9px] text-indigo-400 font-bold mb-0.5">{t.id}</div>}
                               <h5 className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2">{t.task}</h5>
                             </div>
                             <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${

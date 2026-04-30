@@ -1,7 +1,7 @@
-import { Calendar, momentLocalizer } from 'react-big-calendar';
+import { Calendar, momentLocalizer, View } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 const localizer = momentLocalizer(moment);
 
@@ -20,12 +20,15 @@ const colorMap: Record<string, string> = {
 };
 
 export function CalendarViewCustom({ tasks }: { tasks: MyTask[] }) {
+  const [date, setDate] = useState(new Date());
+  const [view, setView] = useState<View>('month');
+
   const events = useMemo(() => {
     return tasks
-      .filter(t => t.start_date)
+      .filter(t => t.start_date && !isNaN(new Date(t.start_date).getTime()))
       .map(t => {
         const start = new Date(t.start_date!);
-        let end = t.end_date ? new Date(t.end_date) : start;
+        let end = (t.end_date && !isNaN(new Date(t.end_date).getTime())) ? new Date(t.end_date) : start;
         const endExclusive = new Date(end);
         endExclusive.setDate(endExclusive.getDate() + 1);
 
@@ -81,12 +84,6 @@ export function CalendarViewCustom({ tasks }: { tasks: MyTask[] }) {
         .dark .rbc-today {
           background-color: #1e1b4b;
         }
-        .rbc-month-row {
-          flex: 1 0 150px; /* Force rows to be taller to fit more events */
-        }
-        .rbc-month-view {
-          overflow-y: auto;
-        }
         .calendar-container .rbc-header {
           padding: 10px 0;
           font-weight: 600;
@@ -101,8 +98,11 @@ export function CalendarViewCustom({ tasks }: { tasks: MyTask[] }) {
         events={events}
         startAccessor="start"
         endAccessor="end"
-        style={{ height: '100%', minHeight: '800px' }}
-        defaultView="month"
+        style={{ height: '100%', minHeight: '600px' }}
+        date={date}
+        view={view}
+        onNavigate={(newDate) => setDate(newDate)}
+        onView={(newView) => setView(newView)}
         views={['month', 'week', 'day', 'agenda']}
         popup={true}
         eventPropGetter={(event) => {
