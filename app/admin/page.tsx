@@ -107,7 +107,22 @@ export default function AdminEntry() {
     setErrorMsg('');
     try {
       const tasksRef = collection(db, 'tasks');
-      const newDoc = doc(tasksRef);
+      
+      // Get all tasks to find the max number globally
+      const allTasksSnap = await getDocs(tasksRef);
+      let maxNum = 0;
+      allTasksSnap.forEach(doc => {
+        const match = doc.id.match(/^Task-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > maxNum) maxNum = num;
+        }
+      });
+      const nextNum = maxNum + 1;
+      const formattedNum = nextNum.toString().padStart(6, '0');
+      const taskId = `Task-${formattedNum}`;
+
+      const newDoc = doc(db, 'tasks', taskId);
       const now = serverTimestamp();
       await setDoc(newDoc, {
         ...form,
@@ -129,8 +144,8 @@ export default function AdminEntry() {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4 pt-20">
         <AlertTriangle size={48} className="text-amber-500" />
-        <h2 className="text-xl font-bold text-white">Access Denied</h2>
-        <p className="text-gray-400 text-center">Only authorized administrators can delegate tasks.</p>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Access Denied</h2>
+        <p className="text-gray-600 dark:text-gray-400 text-center">Only authorized administrators can delegate tasks.</p>
         <button 
           onClick={() => window.location.href = '/'}
           className="bg-indigo-600 text-white px-6 py-2 rounded-xl"
@@ -146,7 +161,7 @@ export default function AdminEntry() {
 
   return (
     <div className="pb-20">
-      <h1 className="text-xl font-semibold text-white mb-6">Delegate Task</h1>
+      <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Delegate Task</h1>
       
       {errorMsg && (
         <div className="bg-red-500/10 text-red-400 border border-red-500/20 p-4 rounded-lg mb-6 font-medium text-sm">
@@ -154,14 +169,14 @@ export default function AdminEntry() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-[#11141A] p-6 rounded-2xl border border-[#1F2937] space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-[#11141A] p-6 rounded-2xl border border-gray-200 dark:border-[#1F2937] space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Area</label>
             <select 
               value={form.area} 
               onChange={e => handleUpdate('area', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               {areas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
             </select>
@@ -171,7 +186,7 @@ export default function AdminEntry() {
             <select 
               value={form.task_type} 
               onChange={e => handleUpdate('task_type', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               {taskTypes.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -184,7 +199,7 @@ export default function AdminEntry() {
             <select 
               value={form.project} 
               onChange={e => handleUpdate('project', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               <option value="">No Project</option>
               {projects.map(p => <option key={p.id} value={p.name}>{p.id} - {p.name}</option>)}
@@ -195,7 +210,7 @@ export default function AdminEntry() {
             <select 
               value={form.assignee}
               onChange={e => handleUpdate('assignee', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               <option value="">Select Assignee</option>
               {contacts.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -208,7 +223,7 @@ export default function AdminEntry() {
           <textarea 
             value={form.task}
             onChange={e => handleUpdate('task', e.target.value)}
-            className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition min-h-[100px] text-white placeholder-gray-600"
+            className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition min-h-[100px] text-gray-900 dark:text-white placeholder-gray-600"
             placeholder="Describe the task clearly..."
           />
         </div>
@@ -219,7 +234,7 @@ export default function AdminEntry() {
             <select 
               value={form.priority}
               onChange={e => handleUpdate('priority', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               <option value="High">High</option>
               <option value="Medium">Medium</option>
@@ -232,7 +247,7 @@ export default function AdminEntry() {
               type="date"
               value={form.start_date}
               onChange={e => handleUpdate('start_date', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-gray-900 dark:text-white"
             />
           </div>
           <div className="space-y-1.5 min-w-0">
@@ -241,7 +256,7 @@ export default function AdminEntry() {
               type="date"
               value={form.end_date}
               onChange={e => handleUpdate('end_date', e.target.value)}
-              className="w-full px-4 py-2.5 bg-[#0B0D10] border border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-white"
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition block text-gray-900 dark:text-white"
             />
           </div>
         </div>
@@ -249,7 +264,7 @@ export default function AdminEntry() {
         <button 
           type="submit" 
           disabled={submitting}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-lg py-3 rounded-xl transition mt-6 flex justify-center items-center"
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-gray-900 dark:text-white font-medium text-lg py-3 rounded-xl transition mt-6 flex justify-center items-center"
         >
           {submitting ? <Loader2 className="animate-spin w-6 h-6" /> : 'Delegate Task'}
         </button>

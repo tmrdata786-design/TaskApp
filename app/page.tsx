@@ -8,6 +8,8 @@ import { CheckCircle, Clock, Trash2, LayoutList, Table2, KanbanSquare, CalendarD
 import { useAdmin } from '../lib/useAdmin';
 import EditTaskModal from '../components/EditTaskModal';
 import FeedbackModal from '../components/FeedbackModal';
+import { GanttViewCustom } from '../components/GanttViewCustom';
+import { CalendarViewCustom } from '../components/CalendarViewCustom';
 
 interface Task {
   id: string;
@@ -32,7 +34,7 @@ function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: str
         type="date"
         autoFocus
         defaultValue={value || ''}
-        className="bg-[#1A1D23] border border-indigo-500 rounded text-xs text-white px-1 py-0.5 outline-none inline-block w-auto"
+        className="bg-gray-50 dark:bg-[#1A1D23] border border-indigo-500 rounded text-xs text-gray-900 dark:text-white px-1 py-0.5 outline-none inline-block w-auto"
         onBlur={(e) => {
           setEditing(false);
           if (e.target.value !== value) {
@@ -77,6 +79,7 @@ export default function Dashboard() {
   const [activeEditTask, setActiveEditTask] = useState<Task | null>(null);
 
   // Filters
+  const [searchQuery, setSearchQuery] = useState('');
   const [areaFilter, setAreaFilter] = useState('All');
   const [projectFilter, setProjectFilter] = useState('All');
   const [assigneeFilter, setAssigneeFilter] = useState('All');
@@ -209,6 +212,18 @@ export default function Dashboard() {
   const allTaskTypes = Array.from(new Set(tasks.map(t => t.task_type))).filter(Boolean);
 
   const filteredTasks = tasks.filter(t => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (
+        !t.task.toLowerCase().includes(q) &&
+        !t.id.toLowerCase().includes(q) &&
+        !t.assignee.toLowerCase().includes(q) &&
+        !t.area.toLowerCase().includes(q) &&
+        !(t.project && t.project.toLowerCase().includes(q))
+      ) {
+        return false;
+      }
+    }
     if (areaFilter !== 'All' && t.area !== areaFilter) return false;
     if (projectFilter !== 'All' && t.project !== projectFilter) return false;
     if (assigneeFilter !== 'All' && t.assignee !== assigneeFilter) return false;
@@ -223,39 +238,47 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 pb-20">
       <div className="flex flex-col mb-4 space-y-4 sm:flex-row sm:justify-between sm:items-end sm:space-y-0">
-        <h1 className="text-xl font-semibold text-white">Dashboard Overview</h1>
-        <div className="flex bg-[#11141A] p-1 rounded-xl border border-[#1F2937] self-start sm:self-auto overflow-x-auto">
-          <button onClick={() => setView('list')} className={`p-1.5 rounded-lg transition ${view === 'list' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`} title="List View"><LayoutList size={18} /></button>
-          <button onClick={() => setView('table')} className={`p-1.5 rounded-lg transition ${view === 'table' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`} title="Table View"><Table2 size={18} /></button>
-          <button onClick={() => setView('kanban')} className={`p-1.5 rounded-lg transition ${view === 'kanban' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`} title="Kanban View"><KanbanSquare size={18} /></button>
-          <button onClick={() => setView('calendar')} className={`p-1.5 rounded-lg transition ${view === 'calendar' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`} title="Calendar View"><CalendarDays size={18} /></button>
-          <button onClick={() => setView('gantt')} className={`p-1.5 rounded-lg transition ${view === 'gantt' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-300'}`} title="Gantt View"><BarChartHorizontal size={18} /></button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white shrink-0">Dashboard Overview</h1>
+          <input 
+            type="text"
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-700 dark:text-gray-300 px-4 py-2 outline-none focus:border-indigo-500 transition w-full sm:w-64"
+          />
+        </div>
+        <div className="flex bg-white dark:bg-[#11141A] p-1 rounded-xl border border-gray-200 dark:border-[#1F2937] self-start sm:self-auto overflow-x-auto shrink-0">
+          <button onClick={() => setView('list')} className={`p-1.5 rounded-lg transition ${view === 'list' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`} title="List View"><LayoutList size={18} /></button>
+          <button onClick={() => setView('table')} className={`p-1.5 rounded-lg transition ${view === 'table' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`} title="Table View"><Table2 size={18} /></button>
+          <button onClick={() => setView('kanban')} className={`p-1.5 rounded-lg transition ${view === 'kanban' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`} title="Kanban View"><KanbanSquare size={18} /></button>
+          <button onClick={() => setView('calendar')} className={`p-1.5 rounded-lg transition ${view === 'calendar' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`} title="Calendar View"><CalendarDays size={18} /></button>
+          <button onClick={() => setView('gantt')} className={`p-1.5 rounded-lg transition ${view === 'gantt' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`} title="Gantt View"><BarChartHorizontal size={18} /></button>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-[#11141A] p-4 rounded-2xl border border-[#1F2937]">
+        <div className="bg-white dark:bg-[#11141A] p-4 rounded-2xl border border-gray-200 dark:border-[#1F2937]">
           <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Active Tasks</p>
-          <p className="text-2xl font-bold mt-1 text-white">{activeTasks}</p>
+          <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">{activeTasks}</p>
         </div>
-        <div className="bg-[#11141A] p-4 rounded-2xl border border-[#1F2937]">
+        <div className="bg-white dark:bg-[#11141A] p-4 rounded-2xl border border-gray-200 dark:border-[#1F2937]">
           <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Completed</p>
-          <p className="text-2xl font-bold mt-1 text-white">{completedTasks}</p>
+          <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">{completedTasks}</p>
         </div>
-        <div className="bg-[#11141A] p-4 rounded-2xl border border-[#1F2937]">
+        <div className="bg-white dark:bg-[#11141A] p-4 rounded-2xl border border-gray-200 dark:border-[#1F2937]">
           <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">High Priority</p>
-          <p className="text-2xl font-bold mt-1 text-white">{highPriority}</p>
+          <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">{highPriority}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <select 
             value={areaFilter} 
             onChange={(e) => setAreaFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
           >
             <option value="All">All Areas</option>
             {allAreas.map(a => <option key={a} value={a}>{a}</option>)}
@@ -263,7 +286,7 @@ export default function Dashboard() {
           <select 
             value={projectFilter} 
             onChange={(e) => setProjectFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
           >
             <option value="All">All Projects</option>
             {allProjects.map(p => <option key={p} value={p}>{p}</option>)}
@@ -271,7 +294,7 @@ export default function Dashboard() {
           <select 
             value={assigneeFilter} 
             onChange={(e) => setAssigneeFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
           >
             <option value="All">All Assignees</option>
             {allAssignees.map(a => <option key={a} value={a}>{a}</option>)}
@@ -279,7 +302,7 @@ export default function Dashboard() {
           <select 
             value={statusFilter} 
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
           >
             <option value="All">All Statuses</option>
             {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
@@ -287,7 +310,7 @@ export default function Dashboard() {
           <select 
             value={priorityFilter} 
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
           >
             <option value="All">All Priorities</option>
             {allPriorities.map(p => <option key={p} value={p}>{p}</option>)}
@@ -295,49 +318,49 @@ export default function Dashboard() {
           <select 
             value={taskTypeFilter} 
             onChange={(e) => setTaskTypeFilter(e.target.value)}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
+            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
           >
             <option value="All">All Task Types</option>
             {allTaskTypes.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">Date Range:</span>
-          <input 
-            type="date"
-            value={startDateFilter}
-            onChange={(e) => setStartDateFilter(e.target.value)}
-            onClick={(e) => {
-              try { e.currentTarget.showPicker(); } catch(err) {} 
-            }}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
-            title="Start Date (From)"
-          />
-          <span className="text-gray-500 text-sm">to</span>
-          <input 
-            type="date"
-            value={endDateFilter}
-            onChange={(e) => setEndDateFilter(e.target.value)}
-            onClick={(e) => {
-              try { e.currentTarget.showPicker(); } catch(err) {} 
-            }}
-            className="bg-[#11141A] border border-[#1F2937] rounded-lg text-sm text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
-            title="End Date (To)"
-          />
-          {(startDateFilter || endDateFilter) && (
-            <button 
-              onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}
-              className="text-xs text-gray-400 hover:text-white transition underline"
-            >
-              Clear Dates
-            </button>
-          )}
-        </div>
-      </div>
 
-      <div className="bg-[#11141A] rounded-2xl border border-[#1F2937] flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-[#1F2937] flex items-center justify-between">
-          <h3 className="font-semibold text-white capitalize">{view} View <span className="ml-2 text-xs text-gray-500 bg-[#1A1D23] px-2 py-0.5 rounded-full">{filteredTasks.length} tasks</span></h3>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">Date Range:</span>
+            <input 
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+              onClick={(e) => {
+                try { e.currentTarget.showPicker(); } catch(err) {} 
+              }}
+              className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
+              title="Start Date (From)"
+            />
+            <span className="text-gray-500 text-sm">to</span>
+            <input 
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              onClick={(e) => {
+                try { e.currentTarget.showPicker(); } catch(err) {} 
+              }}
+              className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-1.5 outline-none focus:border-indigo-500 transition cursor-pointer"
+              title="End Date (To)"
+            />
+            {(startDateFilter || endDateFilter) && (
+              <button 
+                onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}
+                className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white transition underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+      <div className="bg-white dark:bg-[#11141A] rounded-2xl border border-gray-200 dark:border-[#1F2937] flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-[#1F2937] flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900 dark:text-white capitalize">{view} View <span className="ml-2 text-xs text-gray-500 bg-gray-50 dark:bg-[#1A1D23] px-2 py-0.5 rounded-full">{filteredTasks.length} tasks</span></h3>
         </div>
         
         {filteredTasks.length === 0 ? (
@@ -363,12 +386,15 @@ export default function Dashboard() {
                         )}
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
                           t.priority === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
-                          t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                          t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
                         }`}>
                           {t.priority}
                         </span>
                       </div>
-                      <h3 className="text-sm font-medium text-white leading-tight mt-1">{t.task}</h3>
+                      <div className="text-[10px] text-indigo-400 font-bold mb-1">
+                        {t.id}
+                      </div>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white leading-tight">{t.task}</h3>
                       <p className="text-xs font-medium text-gray-500 mt-1">Assignee: {t.assignee}</p>
                       <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1">
                         <CalendarDays size={12} className="inline mr-1"/>
@@ -381,7 +407,7 @@ export default function Dashboard() {
                     <div className="flex items-center space-x-1">
                       <button 
                         onClick={() => setActiveFeedbackTask(t)}
-                        className="p-1.5 text-gray-400 hover:text-indigo-400 rounded-lg hover:bg-[#1A1D23] transition flex items-center"
+                        className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-indigo-400 rounded-lg hover:bg-gray-50 dark:bg-[#1A1D23] transition flex items-center"
                         title="Feedback"
                       >
                         <MessageSquare size={16} />
@@ -390,7 +416,7 @@ export default function Dashboard() {
                       {isAdmin && (
                         <button 
                           onClick={() => setActiveEditTask(t)}
-                          className="p-1.5 text-gray-500 hover:text-indigo-400 rounded-lg hover:bg-[#1A1D23] transition"
+                          className="p-1.5 text-gray-500 hover:text-indigo-400 rounded-lg hover:bg-gray-50 dark:bg-[#1A1D23] transition"
                           title="Edit Task"
                         >
                           <Edit size={16} />
@@ -400,7 +426,7 @@ export default function Dashboard() {
                       {isAdmin && (
                         <button 
                           onClick={() => deleteTask(t.id)}
-                          className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-[#1A1D23] transition"
+                          className="p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-gray-50 dark:bg-[#1A1D23] transition"
                           title="Delete task"
                         >
                           <Trash2 size={16} />
@@ -417,7 +443,7 @@ export default function Dashboard() {
                         className={`flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-lg text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
                           t.status === 'Completed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
                           t.status === 'In Progress' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                          'bg-[#1A1D23] text-gray-400 border border-[#2D3139]'
+                          'bg-gray-50 dark:bg-[#1A1D23] text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-[#2D3139]'
                         }`}
                       >
                         {t.status === 'Completed' ? <CheckCircle size={14} /> : <Clock size={14} />}
@@ -439,7 +465,7 @@ export default function Dashboard() {
                             className="w-full h-1.5 bg-[#2D3139] rounded appearance-none cursor-pointer accent-indigo-500 block disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         </div>
-                        <span className="text-xs font-medium text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
                       </div>
                     </div>
                   </div>
@@ -450,25 +476,28 @@ export default function Dashboard() {
 
           {view === 'table' && (
             <table className="w-full text-left text-sm whitespace-nowrap min-w-[900px]">
-              <thead className="bg-[#1A1D23] text-gray-400 border-b border-[#1F2937]">
+              <thead className="bg-gray-50 dark:bg-[#1A1D23] text-gray-600 dark:text-gray-400 border-b border-gray-200 dark:border-[#1F2937]">
                 <tr>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Task</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Project</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Area</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Assignee</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Dates</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Status</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Progress</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white transition">Actions</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Task</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Project</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Area</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Assignee</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Dates</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Status</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Progress</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 dark:text-white transition">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F2937]/50">
                 {filteredTasks.map(t => (
-                  <tr key={t.id} className="hover:bg-[#1A1D23]/50 transition">
-                    <td className="px-4 py-3 truncate max-w-[200px] text-gray-200">{t.task}</td>
+                  <tr key={t.id} className="hover:bg-gray-50 dark:bg-[#1A1D23]/50 transition">
+                    <td className="px-4 py-3 truncate max-w-[200px] text-gray-800 dark:text-gray-200">
+                      <div className="text-[10px] text-indigo-400 font-bold mb-0.5">{t.id}</div>
+                      {t.task}
+                    </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{t.project || '-'}</td>
-                    <td className="px-4 py-3 text-gray-400">{t.area}</td>
-                    <td className="px-4 py-3 text-gray-400">{t.assignee}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{t.area}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{t.assignee}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
                       {' - '}
@@ -481,7 +510,7 @@ export default function Dashboard() {
                         className={`px-2 py-1 rounded text-xs inline-flex items-center gap-1 border disabled:cursor-not-allowed ${
                         t.status === 'Completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                         t.status === 'In Progress' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
-                        'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                        'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
                         }`}
                       >
                         {t.status === 'Completed' ? <CheckCircle size={12} /> : <Clock size={12} />}
@@ -500,12 +529,12 @@ export default function Dashboard() {
                           disabled={!isAdmin}
                           className="w-full h-1.5 bg-[#2D3139] rounded appearance-none cursor-pointer accent-indigo-500 block disabled:opacity-50 disabled:cursor-not-allowed"
                         />
-                        <span className="text-xs text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center space-x-1">
-                        <button onClick={() => setActiveFeedbackTask(t)} className="p-1 text-gray-400 hover:text-indigo-400 rounded transition" title="Feedback">
+                        <button onClick={() => setActiveFeedbackTask(t)} className="p-1 text-gray-600 dark:text-gray-400 hover:text-indigo-400 rounded transition" title="Feedback">
                           <MessageSquare size={14} />
                         </button>
                         {isAdmin && (
@@ -527,23 +556,26 @@ export default function Dashboard() {
           )}
 
           {view === 'kanban' && (
-            <div className="flex space-x-4 p-4 min-w-[800px] overflow-x-auto bg-[#0B0D10]/50">
+            <div className="flex space-x-4 p-4 min-w-[800px] overflow-x-auto bg-gray-100 dark:bg-[#0B0D10]/50">
               {['Pending', 'In Progress', 'Completed'].map(status => {
                 const columnTasks = filteredTasks.filter(t => t.status === status);
                 return (
-                  <div key={status} className="flex-1 bg-[#11141A] rounded-xl border border-[#1F2937] p-3 flex flex-col min-w-[250px]">
+                  <div key={status} className="flex-1 bg-white dark:bg-[#11141A] rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 flex flex-col min-w-[250px]">
                     <div className="flex items-center justify-between mb-4 px-1">
-                      <h4 className="text-sm font-semibold text-gray-300">{status}</h4>
-                      <span className="text-xs bg-[#1A1D23] px-2 py-0.5 rounded text-gray-500">{columnTasks.length}</span>
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{status}</h4>
+                      <span className="text-xs bg-gray-50 dark:bg-[#1A1D23] px-2 py-0.5 rounded text-gray-500">{columnTasks.length}</span>
                     </div>
                     <div className="space-y-3 flex-1">
                       {columnTasks.map(t => (
-                        <div key={t.id} className="bg-[#1A1D23] p-3 rounded-lg border border-[#2D3139] space-y-2 hover:border-indigo-500/50 transition relative group">
+                        <div key={t.id} className="bg-gray-50 dark:bg-[#1A1D23] p-3 rounded-lg border border-gray-300 dark:border-[#2D3139] space-y-2 hover:border-indigo-500/50 transition relative group">
                           <div className="flex items-start justify-between gap-2">
-                            <h5 className="text-xs font-medium text-gray-200 line-clamp-2 pr-4">{t.task}</h5>
+                            <div className="min-w-0 pr-4">
+                              <div className="text-[9px] text-indigo-400 font-bold mb-0.5">{t.id}</div>
+                              <h5 className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2">{t.task}</h5>
+                            </div>
                             <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
                               t.priority === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
-                              t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+                              t.priority === 'Medium' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20'
                             }`}>{t.priority}</span>
                           </div>
                           
@@ -558,7 +590,7 @@ export default function Dashboard() {
                           </div>
 
                           <div className="flex justify-between items-end text-gray-500">
-                            <span className="text-[10px] bg-[#0B0D10] px-1.5 py-0.5 rounded">{t.assignee}</span>
+                            <span className="text-[10px] bg-gray-100 dark:bg-[#0B0D10] px-1.5 py-0.5 rounded">{t.assignee}</span>
                             <span className="text-[10px] font-medium">{Math.round(t.progress * 100)}%</span>
                           </div>
                           {isAdmin && (
@@ -580,58 +612,14 @@ export default function Dashboard() {
           )}
 
           {view === 'calendar' && (
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 min-w-[300px]">
-              {filteredTasks.filter(t => t.start_date || t.end_date).map(t => (
-                <div key={t.id} className="bg-[#1A1D23] p-3 rounded-xl border border-[#2D3139]">
-                  <div className="flex items-center gap-2 mb-2 text-indigo-400 text-xs">
-                    <CalendarDays size={14} />
-                    <span>
-                      <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
-                      {' - '}
-                      <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
-                    </span>
-                  </div>
-                  <h5 className="text-sm font-medium text-gray-200 truncate">{t.task}</h5>
-                  <p className="text-xs text-gray-500 mt-1">{t.status}</p>
-                </div>
-              ))}
-              {filteredTasks.filter(t => !t.start_date && !t.end_date).length > 0 && (
-                <div className="col-span-full p-3 pt-4 border-t border-[#1F2937] mt-2">
-                   <p className="text-xs text-gray-500">Plus {filteredTasks.filter(t => !t.start_date && !t.end_date).length} tasks with no dates scheduled.</p>
-                </div>
-              )}
+            <div className="p-4 overflow-x-auto min-w-[300px]">
+              <CalendarViewCustom tasks={filteredTasks} />
             </div>
           )}
 
           {view === 'gantt' && (
             <div className="p-4 overflow-x-auto min-w-[600px]">
-              <div className="flex flex-col space-y-2 border-l border-b border-[#1F2937] pb-4 pl-4 relative">
-                {filteredTasks.map(t => {
-                  if (!t.start_date || !t.end_date) return null;
-                  
-                  const start = new Date(t.start_date).getTime();
-                  const end = new Date(t.end_date).getTime();
-                  if (isNaN(start) || isNaN(end) || end < start) return null;
-                  
-                  const durationDays = Math.max(1, (end - start) / (1000 * 60 * 60 * 24));
-                  const width = Math.min(durationDays * 20, 300); // 20px per day, max 300px
-                  
-                  return (
-                    <div key={t.id} className="flex items-center gap-3">
-                      <div className="w-32 text-xs text-gray-400 truncate text-right">{t.task}</div>
-                      <div className="h-6 bg-indigo-600/20 border border-indigo-500/50 rounded flex items-center px-2 relative" style={{ width: `${width}px` }}>
-                        <div className="absolute top-0 left-0 bottom-0 bg-indigo-600/40" style={{ width: `${t.progress * 100}%` }} />
-                        <span className="text-[9px] text-white whitespace-nowrap z-10 shrink-0 select-none cursor-pointer">
-                           <EditableDate taskId={t.id} field="start_date" value={t.start_date} isAdmin={isAdmin} onUpdate={updateDate} />
-                           {' - '}
-                           <EditableDate taskId={t.id} field="end_date" value={t.end_date} isAdmin={isAdmin} onUpdate={updateDate} />
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-               <p className="text-xs text-gray-600 mt-4 text-center">Gantt view shows tasks with both valid Start and End dates.</p>
+               <GanttViewCustom tasks={filteredTasks} />
             </div>
           )}
 

@@ -55,14 +55,14 @@ export default function FeedbackModal({ taskId, taskName, onClose }: { taskId: s
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#11141A] rounded-2xl border border-[#1F2937] w-full max-w-lg flex flex-col max-h-[85vh] h-[600px]">
+      <div className="bg-white dark:bg-[#11141A] rounded-2xl border border-gray-200 dark:border-[#1F2937] w-full max-w-lg flex flex-col max-h-[85vh] h-[600px]">
         {/* Header */}
-        <div className="p-4 border-b border-[#1F2937] flex justify-between items-center bg-[#1A1D23] rounded-t-2xl">
+        <div className="p-4 border-b border-gray-200 dark:border-[#1F2937] flex justify-between items-center bg-gray-50 dark:bg-[#1A1D23] rounded-t-2xl">
           <div>
-            <h2 className="text-sm font-semibold text-white">Task Feedback</h2>
-            <p className="text-xs text-gray-400 mt-1 truncate max-w-[300px]">{taskName}</p>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Task Feedback</h2>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate max-w-[300px]">{taskName}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition px-2 py-1">Close</button>
+          <button onClick={onClose} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white transition px-2 py-1">Close</button>
         </div>
 
         {/* Chat window */}
@@ -86,7 +86,7 @@ export default function FeedbackModal({ taskId, taskName, onClose }: { taskId: s
                   <div className={`p-3 rounded-2xl text-sm ${
                     isCurrentUser 
                       ? 'bg-indigo-600 text-white rounded-br-sm' 
-                      : 'bg-[#1F2937] text-gray-200 rounded-bl-sm'
+                      : 'bg-[#1F2937] text-gray-800 dark:text-gray-200 rounded-bl-sm'
                   }`}>
                     {m.text}
                   </div>
@@ -101,14 +101,14 @@ export default function FeedbackModal({ taskId, taskName, onClose }: { taskId: s
         </div>
 
         {/* Input */}
-        <form onSubmit={handleSubmit} className="p-3 border-t border-[#1F2937] bg-[#1A1D23] rounded-b-2xl flex gap-2">
+        <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 dark:border-[#1F2937] bg-gray-50 dark:bg-[#1A1D23] rounded-b-2xl flex gap-2">
           <input 
             type="text" 
             placeholder="Type a message..."
             value={text}
             onChange={(e) => setText(e.target.value)}
             disabled={submitting}
-            className="flex-1 bg-[#0B0D10] border border-[#2D3139] rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+            className="flex-1 bg-gray-100 dark:bg-[#0B0D10] border border-gray-300 dark:border-[#2D3139] rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 transition"
           />
           <button 
             type="submit" 
