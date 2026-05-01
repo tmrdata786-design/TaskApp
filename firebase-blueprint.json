@@ -15,6 +15,30 @@
         "start_date": { "type": "string", "format": "date" },
         "end_date": { "type": "string", "format": "date" },
         "progress": { "type": "number" },
+        "subtasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "isCompleted": { "type": "boolean" }
+            },
+            "required": ["id", "title", "isCompleted"]
+          }
+        },
+        "activityLog": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": { "type": "string" },
+              "timestamp": { "type": "number" },
+              "user": { "type": "string" }
+            },
+            "required": ["action", "timestamp", "user"]
+          }
+        },
         "notes": { "type": "string" },
         "flag": { "type": "string" },
         "feedback": { "type": "string" },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestoreError';
 import { CheckCircle, Clock, Trash2, LayoutList, Table2, KanbanSquare, CalendarDays, BarChartHorizontal, MessageSquare, Edit } from 'lucide-react';
@@ -23,6 +23,8 @@ interface Task {
   progress: number;
   start_date?: string;
   end_date?: string;
+  subtasks?: { id: string; title: string; isCompleted: boolean }[];
+  activityLog?: { action: string; timestamp: number; user: string }[];
 }
 
 function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: string, field: 'start_date'|'end_date', value?: string, isAdmin: boolean, onUpdate: (id: string, field: string, val: string) => void }) {
@@ -138,13 +140,18 @@ export default function Dashboard() {
     };
   }, [isAdmin, isManager, userArea, userContactName, adminLoading]);
 
-  const updateStatus = async (id: string, currentStatus: string, taskArea: string) => {
+  const updateStatus = async (id: string, currentStatus: string, taskArea: string, explicitStatus?: string) => {
     if (!isAdmin && !(isManager && taskArea === userArea)) return;
-    const nextStatus = currentStatus === 'Pending' ? 'In Progress' : 
-                       currentStatus === 'In Progress' ? 'Completed' : 'Pending';
+    const nextStatus = explicitStatus || (currentStatus === 'Pending' ? 'In Progress' : 
+                       currentStatus === 'In Progress' ? 'Completed' : 'Pending');
+    
+    if (nextStatus === currentStatus) return;
+
     try {
+      const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
       await updateDoc(doc(db, 'tasks', id), { 
         status: nextStatus,
+        activityLog: arrayUnion({ action: `Status changed from ${currentStatus} to ${nextStatus}`, timestamp: Date.now(), user: userIdent }),
         updated_at: serverTimestamp()
       });
     } catch (error) {
@@ -154,9 +161,12 @@ export default function Dashboard() {
 
   const updateProgress = async (id: string, val: string, taskArea: string) => {
     if (!isAdmin && !(isManager && taskArea === userArea)) return;
+    const newProgress = parseInt(val, 10) / 100;
     try {
+      const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
       await updateDoc(doc(db, 'tasks', id), { 
-        progress: parseInt(val, 10) / 100,
+        progress: newProgress,
+        activityLog: arrayUnion({ action: `Progress updated to ${val}%`, timestamp: Date.now(), user: userIdent }),
         updated_at: serverTimestamp()
       });
     } catch (error) {
@@ -167,8 +177,10 @@ export default function Dashboard() {
   const updateDate = async (id: string, field: string, val: string) => {
     if (!isAdmin) return;
     try {
+      const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
       await updateDoc(doc(db, 'tasks', id), { 
         [field]: val,
+        activityLog: arrayUnion({ action: `${field.replace('_', ' ')} updated to ${val}`, timestamp: Date.now(), user: userIdent }),
         updated_at: serverTimestamp()
       });
     } catch (error) {
@@ -552,14 +564,38 @@ export default function Dashboard() {
               {['Pending', 'In Progress', 'Completed'].map(status => {
                 const columnTasks = filteredTasks.filter(t => t.status === status);
                 return (
-                  <div key={status} className="flex-1 bg-white dark:bg-[#11141A] rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 flex flex-col min-w-[250px]">
+                  <div 
+                    key={status} 
+                    className="flex-1 bg-white dark:bg-[#11141A] rounded-xl border border-gray-200 dark:border-[#1F2937] p-3 flex flex-col min-w-[250px]"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const droppedTaskId = e.dataTransfer.getData('taskId');
+                      const taskArea = e.dataTransfer.getData('taskArea');
+                      const currentStatus = e.dataTransfer.getData('currentStatus');
+                      if (droppedTaskId && currentStatus !== status) {
+                        updateStatus(droppedTaskId, currentStatus, taskArea, status);
+                      }
+                    }}
+                  >
                     <div className="flex items-center justify-between mb-4 px-1">
                       <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{status}</h4>
                       <span className="text-xs bg-gray-50 dark:bg-[#1A1D23] px-2 py-0.5 rounded text-gray-500">{columnTasks.length}</span>
                     </div>
                     <div className="space-y-3 flex-1">
                       {columnTasks.map(t => (
-                        <div key={t.id} className="bg-gray-50 dark:bg-[#1A1D23] p-3 rounded-lg border border-gray-300 dark:border-[#2D3139] space-y-2 hover:border-indigo-500/50 transition relative group">
+                        <div 
+                          key={t.id} 
+                          draggable={isAdmin || (isManager && t.area === userArea)}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('taskId', t.id);
+                            e.dataTransfer.setData('taskArea', t.area);
+                            e.dataTransfer.setData('currentStatus', t.status);
+                          }}
+                          className={`${(isAdmin || (isManager && t.area === userArea)) ? 'cursor-grab active:cursor-grabbing hover:border-indigo-500/50' : ''} bg-gray-50 dark:bg-[#1A1D23] p-3 rounded-lg border border-gray-300 dark:border-[#2D3139] space-y-2 transition relative group`}
+                        >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 pr-4">
                               {t.id.startsWith('Task') && <div className="text-[9px] text-indigo-400 font-bold mb-0.5">{t.id}</div>}

@@ -10,7 +10,7 @@ import { useAdmin } from '../../lib/useAdmin';
 
 export default function AdminEntry() {
   const router = useRouter();
-  const { isAdmin, isManager, userArea, loading: adminLoading } = useAdmin();
+  const { isAdmin, isManager, userArea, userContactName, loading: adminLoading } = useAdmin();
   const isAuthorized = isAdmin || isManager;
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -134,10 +134,14 @@ export default function AdminEntry() {
 
       const newDoc = doc(db, 'tasks', taskId);
       const now = serverTimestamp();
+      
+      const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
       await setDoc(newDoc, {
         ...form,
         created_at: now,
-        updated_at: now
+        updated_at: now,
+        activityLog: [{ action: 'Task created', timestamp: Date.now(), user: userIdent }],
+        subtasks: []
       });
       router.push('/');
     } catch (error) {
