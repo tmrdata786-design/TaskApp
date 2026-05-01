@@ -10,13 +10,14 @@ import { useAdmin } from '../../lib/useAdmin';
 
 export default function AdminEntry() {
   const router = useRouter();
-  const { isAdmin: isAuthorized, loading: adminLoading } = useAdmin();
+  const { isAdmin, isManager, userArea, loading: adminLoading } = useAdmin();
+  const isAuthorized = isAdmin || isManager;
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
-  const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
+  const [contacts, setContacts] = useState<{ id: string; name: string; role?: string; area?: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const [form, setForm] = useState({
@@ -66,10 +67,12 @@ export default function AdminEntry() {
 
         // Set defaults
         if (areaList.length > 0) {
+          const defaultAreaName = (!isAdmin && isManager && userArea) ? userArea : areaList[0].name;
+          const defaultArea = areaList.find(a => a.name === defaultAreaName) || areaList[0];
           setForm(prev => ({
             ...prev,
-            area: areaList[0].name,
-            task_type: areaList[0].task_types[0] || ''
+            area: defaultArea.name,
+            task_type: defaultArea.task_types[0] || ''
           }));
         }
       } catch (e) {
@@ -79,7 +82,7 @@ export default function AdminEntry() {
       }
     }
     initData();
-  }, []);
+  }, [isAdmin, isManager, userArea]);
 
   const handleUpdate = (field: string, val: string | number) => {
     setForm(prev => {
@@ -145,7 +148,7 @@ export default function AdminEntry() {
       <div className="flex flex-col items-center justify-center p-8 space-y-4 pt-20">
         <AlertTriangle size={48} className="text-amber-500" />
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Access Denied</h2>
-        <p className="text-gray-600 dark:text-gray-400 text-center">Only authorized administrators can delegate tasks.</p>
+        <p className="text-gray-600 dark:text-gray-400 text-center">Only authorized operators can delegate tasks.</p>
         <button 
           onClick={() => window.location.href = '/'}
           className="bg-indigo-600 text-white px-6 py-2 rounded-xl"
@@ -176,9 +179,10 @@ export default function AdminEntry() {
             <select 
               value={form.area} 
               onChange={e => handleUpdate('area', e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
+              disabled={!isAdmin && isManager}
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white disabled:opacity-50"
             >
-              {areas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+              { areas.filter(a => isAdmin || a.name === userArea).map(a => <option key={a.id} value={a.name}>{a.name}</option>) }
             </select>
           </div>
           <div className="space-y-1.5">
@@ -213,7 +217,7 @@ export default function AdminEntry() {
               className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
             >
               <option value="">Select Assignee</option>
-              {contacts.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {contacts.filter(c => isAdmin || (isManager && c.area === userArea && (c.role === 'User' || !c.role))).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
         </div>

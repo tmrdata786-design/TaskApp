@@ -15,17 +15,19 @@ export default function SettingsPage() {
   
   // States for data
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
-  const [contacts, setContacts] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [contacts, setContacts] = useState<{ id: string; name: string; email: string; role?: string; area?: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string; description: string; created_at: string }[]>([]);
   const [admin, setAdmin] = useState<any>({ developer_name: 'Umar Latif', company_name: 'TM Rubber', admin_email: '', admin_emails: [] });
 
   // Form states
-  const [editingContact, setEditingContact] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [editingContact, setEditingContact] = useState<{ id: string; name: string; email: string; role?: string; area?: string } | null>(null);
   const [editingProject, setEditingProject] = useState<{ id: string; name: string; description: string } | null>(null);
   const [newArea, setNewArea] = useState('');
   const [newTaskType, setNewTaskType] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  const [contactRole, setContactRole] = useState('User');
+  const [contactArea, setContactArea] = useState('');
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
 
@@ -118,9 +120,16 @@ export default function SettingsPage() {
     if (!contactName.trim()) return;
     try {
       const id = contactName.toLowerCase().replace(/\s+/g, '-');
-      await setDoc(doc(db, 'contacts', id), { name: contactName, email: contactEmail });
+      await setDoc(doc(db, 'contacts', id), { 
+        name: contactName, 
+        email: contactEmail,
+        role: contactRole,
+        area: contactArea
+      });
       setContactName('');
       setContactEmail('');
+      setContactRole('User');
+      setContactArea('');
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'contacts');
     }
@@ -131,7 +140,9 @@ export default function SettingsPage() {
     try {
       await setDoc(doc(db, 'contacts', editingContact.id), { 
         name: editingContact.name, 
-        email: editingContact.email 
+        email: editingContact.email,
+        role: editingContact.role || 'User',
+        area: editingContact.area || ''
       });
       setEditingContact(null);
     } catch (e) {
@@ -328,8 +339,26 @@ export default function SettingsPage() {
                   placeholder="Email (optional)"
                   className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={editingContact ? (editingContact.area || '') : contactArea}
+                  onChange={e => editingContact ? setEditingContact({...editingContact, area: e.target.value}) : setContactArea(e.target.value)}
+                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-900 dark:text-white outline-none"
+                >
+                  <option value="">Select Area</option>
+                  {areas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                </select>
+                <select 
+                  value={editingContact ? (editingContact.role || 'User') : contactRole}
+                  onChange={e => editingContact ? setEditingContact({...editingContact, role: e.target.value}) : setContactRole(e.target.value)}
+                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-900 dark:text-white outline-none"
+                >
+                  <option value="User">User</option>
+                  <option value="Manager">Manager</option>
+                </select>
                 {editingContact ? (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button 
                       onClick={updateContact}
                       className="bg-emerald-600 hover:bg-emerald-700 text-gray-900 dark:text-white px-4 py-2 rounded-xl transition font-medium"
@@ -346,7 +375,7 @@ export default function SettingsPage() {
                 ) : (
                   <button 
                     onClick={addContact}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-gray-900 dark:text-white px-4 py-2 rounded-xl transition"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-gray-900 dark:text-white px-4 py-2 rounded-xl transition shrink-0"
                   >
                     <Plus size={20} />
                   </button>
@@ -359,7 +388,13 @@ export default function SettingsPage() {
             {contacts.map(c => (
               <div key={c.id} className="p-4 flex justify-between items-center bg-gray-50 dark:bg-[#1A1D23]/30">
                 <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{c.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{c.name}</p>
+                    <span className="text-[10px] font-bold text-indigo-400 bg-indigo-400/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{c.role || 'User'}</span>
+                    {c.area && (
+                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">{c.area}</span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500">{c.email || 'No email set'}</p>
                 </div>
                 <div className="flex gap-2">

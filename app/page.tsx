@@ -73,7 +73,7 @@ function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: str
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { isAdmin, isManager, userArea, userContactName, loading: adminLoading } = useAdmin();
   const [view, setView] = useState<'list' | 'table' | 'kanban' | 'calendar' | 'gantt'>('list');
   const [activeFeedbackTask, setActiveFeedbackTask] = useState<Task | null>(null);
   const [activeEditTask, setActiveEditTask] = useState<Task | null>(null);
@@ -90,21 +90,7 @@ export default function Dashboard() {
   const [endDateFilter, setEndDateFilter] = useState('');
 
   useEffect(() => {
-    // 1. Fetch contacts so we know the user's name
-    let userContactName: string | null = null;
-    
     const setupTasksListener = async () => {
-      try {
-        const contactSnap = await getDocs(collection(db, 'contacts'));
-        const userEmail = auth.currentUser?.email;
-        if (userEmail) {
-          const contact = contactSnap.docs.find(d => d.data().email === userEmail);
-          if (contact) userContactName = contact.data().name;
-        }
-      } catch (e) {
-        console.warn("Failed to load contacts for user matching", e);
-      }
-
       const q = collection(db, 'tasks');
       const unsubscribe = onSnapshot(q, (snapshot) => {
         let taskList: Task[] = [];
@@ -114,7 +100,11 @@ export default function Dashboard() {
         
         // Filter tasks if not admin
         if (!isAdmin && userContactName) {
-          taskList = taskList.filter(t => t.assignee === userContactName);
+          if (isManager && userArea) {
+            taskList = taskList.filter(t => t.area === userArea || t.assignee === userContactName);
+          } else {
+            taskList = taskList.filter(t => t.assignee === userContactName);
+          }
         } else if (!isAdmin) {
           // If no matching contact, they see no tasks, or maybe we just don't show any until they are added as a contact
           taskList = [];
@@ -146,10 +136,10 @@ export default function Dashboard() {
     return () => {
       if (unsubFn) unsubFn();
     };
-  }, [isAdmin, adminLoading]);
+  }, [isAdmin, isManager, userArea, userContactName, adminLoading]);
 
-  const updateStatus = async (id: string, currentStatus: string) => {
-    if (!isAdmin) return;
+  const updateStatus = async (id: string, currentStatus: string, taskArea: string) => {
+    if (!isAdmin && !(isManager && taskArea === userArea)) return;
     const nextStatus = currentStatus === 'Pending' ? 'In Progress' : 
                        currentStatus === 'In Progress' ? 'Completed' : 'Pending';
     try {
@@ -162,8 +152,8 @@ export default function Dashboard() {
     }
   };
 
-  const updateProgress = async (id: string, val: string) => {
-    if (!isAdmin) return;
+  const updateProgress = async (id: string, val: string, taskArea: string) => {
+    if (!isAdmin && !(isManager && taskArea === userArea)) return;
     try {
       await updateDoc(doc(db, 'tasks', id), { 
         progress: parseInt(val, 10) / 100,
@@ -440,8 +430,8 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-4 items-center">
                     <div className="flex flex-col">
                       <button 
-                        onClick={() => updateStatus(t.id, t.status)}
-                        disabled={!isAdmin}
+                        onClick={() => updateStatus(t.id, t.status, t.area)}
+                        disabled={!isAdmin && !(isManager && t.area === userArea)}
                         className={`flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-lg text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
                           t.status === 'Completed' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
                           t.status === 'In Progress' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
@@ -462,8 +452,8 @@ export default function Dashboard() {
                             max="100" 
                             step="10" 
                             value={t.progress * 100}
-                            onChange={(e) => updateProgress(t.id, e.target.value)}
-                            disabled={!isAdmin}
+                            onChange={(e) => updateProgress(t.id, e.target.value, t.area)}
+                            disabled={!isAdmin && !(isManager && t.area === userArea)}
                             className="w-full h-1.5 bg-[#2D3139] rounded appearance-none cursor-pointer accent-indigo-500 block disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         </div>
@@ -507,8 +497,8 @@ export default function Dashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <button 
-                        onClick={() => updateStatus(t.id, t.status)}
-                        disabled={!isAdmin}
+                        onClick={() => updateStatus(t.id, t.status, t.area)}
+                        disabled={!isAdmin && !(isManager && t.area === userArea)}
                         className={`px-2 py-1 rounded text-xs inline-flex items-center gap-1 border disabled:cursor-not-allowed ${
                         t.status === 'Completed' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                         t.status === 'In Progress' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
@@ -527,8 +517,8 @@ export default function Dashboard() {
                           max="100" 
                           step="10" 
                           value={t.progress * 100}
-                          onChange={(e) => updateProgress(t.id, e.target.value)}
-                          disabled={!isAdmin}
+                          onChange={(e) => updateProgress(t.id, e.target.value, t.area)}
+                          disabled={!isAdmin && !(isManager && t.area === userArea)}
                           className="w-full h-1.5 bg-[#2D3139] rounded appearance-none cursor-pointer accent-indigo-500 block disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <span className="text-xs text-gray-600 dark:text-gray-400 w-8 text-right">{Math.round(t.progress * 100)}%</span>
@@ -595,9 +585,9 @@ export default function Dashboard() {
                             <span className="text-[10px] bg-gray-100 dark:bg-[#0B0D10] px-1.5 py-0.5 rounded">{t.assignee}</span>
                             <span className="text-[10px] font-medium">{Math.round(t.progress * 100)}%</span>
                           </div>
-                          {isAdmin && (
+                          {(isAdmin || (isManager && t.area === userArea)) && (
                             <button 
-                              onClick={() => updateStatus(t.id, status)}
+                              onClick={() => updateStatus(t.id, status, t.area)}
                               className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition p-1 bg-[#2D3139] hover:bg-indigo-600 rounded text-white"
                               title="Update Status"
                             >

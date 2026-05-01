@@ -61,7 +61,9 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "email": { "type": "string" }
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["User", "Manager"] },
+        "area": { "type": "string" }
       },
       "required": ["name"]
     },
