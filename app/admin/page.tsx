@@ -66,15 +66,11 @@ export default function AdminEntry() {
         setProjects(projectSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
 
         // Set defaults
-        if (areaList.length > 0) {
-          const defaultAreaName = (!isAdmin && isManager && userArea) ? userArea : areaList[0].name;
-          const defaultArea = areaList.find(a => a.name === defaultAreaName) || areaList[0];
-          setForm(prev => ({
-            ...prev,
-            area: defaultArea.name,
-            task_type: defaultArea.task_types[0] || ''
-          }));
-        }
+        setForm(prev => ({
+          ...prev,
+          area: '',
+          task_type: ''
+        }));
       } catch (e) {
         handleFirestoreError(e, OperationType.LIST, 'config');
       } finally {
@@ -87,6 +83,17 @@ export default function AdminEntry() {
   const handleUpdate = (field: string, val: string | number) => {
     setForm(prev => {
       let next = { ...prev, [field]: val };
+      if (field === 'assignee') {
+        const contact = contacts.find(c => c.name === val);
+        if (contact && contact.area) {
+          next.area = contact.area;
+          const areaInfo = areas.find(a => a.name === contact.area);
+          next.task_type = areaInfo?.task_types[0] || '';
+        } else {
+          next.area = '';
+          next.task_type = '';
+        }
+      }
       if (field === 'area') {
         const area = areas.find(a => a.name === val);
         next.task_type = area?.task_types[0] || '';
@@ -174,42 +181,7 @@ export default function AdminEntry() {
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-[#11141A] p-6 rounded-2xl border border-gray-200 dark:border-[#1F2937] space-y-5">
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Area</label>
-            <select 
-              value={form.area} 
-              onChange={e => handleUpdate('area', e.target.value)}
-              disabled={!isAdmin && isManager}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white disabled:opacity-50"
-            >
-              { areas.filter(a => isAdmin || a.name === userArea).map(a => <option key={a.id} value={a.name}>{a.name}</option>) }
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Task Type</label>
-            <select 
-              value={form.task_type} 
-              onChange={e => handleUpdate('task_type', e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
-            >
-              {taskTypes.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Project</label>
-            <select 
-              value={form.project} 
-              onChange={e => handleUpdate('project', e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
-            >
-              <option value="">No Project</option>
-              {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 col-span-2">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Assignee</label>
             <select 
               value={form.assignee}
@@ -220,6 +192,41 @@ export default function AdminEntry() {
               {contacts.filter(c => isAdmin || (isManager && c.area === userArea && (c.role === 'User' || !c.role))).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Area</label>
+            <select 
+              value={form.area} 
+              onChange={e => handleUpdate('area', e.target.value)}
+              disabled={true}
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white disabled:opacity-50 cursor-not-allowed"
+            >
+              { form.area ? <option value={form.area}>{form.area}</option> : <option value="">Auto-detected Area</option> }
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Task Type</label>
+            <select 
+              value={form.task_type} 
+              onChange={e => handleUpdate('task_type', e.target.value)}
+              disabled={!form.area}
+              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white disabled:opacity-50"
+            >
+              <option value="">Select task type</option>
+              {taskTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Project</label>
+          <select 
+            value={form.project} 
+            onChange={e => handleUpdate('project', e.target.value)}
+            className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
+          >
+            <option value="">No Project</option>
+            {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+          </select>
         </div>
 
         <div className="space-y-1.5">
