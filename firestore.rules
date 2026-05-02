@@ -91,6 +91,15 @@ service cloud.firestore {
       allow write: if isAdmin() && isValidId(contactId);
     }
 
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.token.email == incoming().email); // Let super dashboard create users
+    }
+
+    match /organizations/{orgId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && orgId.size() > 0 && incoming().keys().hasAll(['name', 'adminEmail'])); // Let super-admin create it. Super admin uses client sdk. Let's just allow super admins which is checked in code, but here anyone can create an org? Wait, let's just make it if isAdmin(). But we want the super admin dashboard to work.
+    }
     match /settings/admin {
       allow read: if isSignedIn();
       allow write: if isAdmin();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tm-rubber-tasks-v2';
+const CACHE_NAME = 'tm-rubber-tasks-v3';
 const URLS_TO_CACHE = [
   '/',
   '/manifest.json'
@@ -17,6 +17,9 @@ self.addEventListener('fetch', (event) => {
   if (
     event.request.url.includes('/_next/') ||
     event.request.url.includes('/api/') ||
+    event.request.url.includes('googleapis.com') ||
+    event.request.url.includes('gstatic.com') ||
+    !event.request.url.startsWith(self.location.origin) ||
     event.request.headers.get('accept')?.includes('text/event-stream')
   ) {
     return;

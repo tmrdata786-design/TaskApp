@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, arrayUnion, query, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestoreError';
 import { CheckCircle, Clock, Trash2, LayoutList, Table2, KanbanSquare, CalendarDays, BarChartHorizontal, MessageSquare, Edit } from 'lucide-react';
@@ -25,6 +25,7 @@ interface Task {
   end_date?: string;
   subtasks?: { id: string; title: string; isCompleted: boolean }[];
   activityLog?: { action: string; timestamp: number; user: string }[];
+  feedbackStatus?: string;
 }
 
 function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: string, field: 'start_date'|'end_date', value?: string, isAdmin: boolean, onUpdate: (id: string, field: string, val: string) => void }) {
@@ -75,7 +76,7 @@ function EditableDate({ taskId, field, value, isAdmin, onUpdate }: { taskId: str
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const { isAdmin, isManager, userArea, userContactName, loading: adminLoading } = useAdmin();
+  const { isAdmin, isManager, userArea, userContactName, orgId, loading: adminLoading } = useAdmin();
   const [view, setView] = useState<'list' | 'table' | 'kanban' | 'calendar' | 'gantt'>('list');
   const [activeFeedbackTask, setActiveFeedbackTask] = useState<Task | null>(null);
   const [activeEditTask, setActiveEditTask] = useState<Task | null>(null);
@@ -93,7 +94,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const setupTasksListener = async () => {
-      const q = collection(db, 'tasks');
+      if (!orgId) {
+        setLoading(false);
+        return () => {};
+      }
+      const q = query(collection(db, 'tasks'), where('orgId', '==', orgId));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         let taskList: Task[] = [];
         snapshot.forEach((doc) => {
@@ -121,6 +126,7 @@ export default function Dashboard() {
         setTasks(taskList);
         setLoading(false);
       }, (error) => {
+        setLoading(false);
         handleFirestoreError(error, OperationType.LIST, 'tasks');
       });
       return unsubscribe;
@@ -138,7 +144,7 @@ export default function Dashboard() {
     return () => {
       if (unsubFn) unsubFn();
     };
-  }, [isAdmin, isManager, userArea, userContactName, adminLoading]);
+  }, [isAdmin, isManager, userArea, userContactName, orgId, adminLoading]);
 
   const updateStatus = async (id: string, currentStatus: string, taskArea: string, explicitStatus?: string) => {
     if (!isAdmin && !(isManager && taskArea === userArea)) return;
@@ -149,9 +155,11 @@ export default function Dashboard() {
 
     try {
       const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
+      // eslint-disable-next-line react-hooks/purity
+      const timestamp = Date.now();
       await updateDoc(doc(db, 'tasks', id), { 
         status: nextStatus,
-        activityLog: arrayUnion({ action: `Status changed from ${currentStatus} to ${nextStatus}`, timestamp: Date.now(), user: userIdent }),
+        activityLog: arrayUnion({ action: `Status changed from ${currentStatus} to ${nextStatus}`, timestamp, user: userIdent }),
         updated_at: serverTimestamp()
       });
     } catch (error) {
@@ -164,9 +172,10 @@ export default function Dashboard() {
     const newProgress = parseInt(val, 10) / 100;
     try {
       const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
+      const timestamp = Date.now();
       await updateDoc(doc(db, 'tasks', id), { 
         progress: newProgress,
-        activityLog: arrayUnion({ action: `Progress updated to ${val}%`, timestamp: Date.now(), user: userIdent }),
+        activityLog: arrayUnion({ action: `Progress updated to ${val}%`, timestamp, user: userIdent }),
         updated_at: serverTimestamp()
       });
     } catch (error) {
@@ -178,9 +187,10 @@ export default function Dashboard() {
     if (!isAdmin) return;
     try {
       const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
+      const timestamp = Date.now();
       await updateDoc(doc(db, 'tasks', id), { 
         [field]: val,
-        activityLog: arrayUnion({ action: `${field.replace('_', ' ')} updated to ${val}`, timestamp: Date.now(), user: userIdent }),
+        activityLog: arrayUnion({ action: `${field.replace('_', ' ')} updated to ${val}`, timestamp, user: userIdent }),
         updated_at: serverTimestamp()
       });
     } catch (error) {
@@ -198,8 +208,12 @@ export default function Dashboard() {
     }
   };
 
-  if (loading || adminLoading) {
-    return <div className="p-8 text-center text-gray-500">Loading tasks...</div>;
+  if (adminLoading) {
+    return <div className="p-8 text-center text-gray-500">Checking permissions...</div>;
+  }
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Fetching tasks...</div>;
   }
 
   const activeTasks = tasks.filter(t => t.status !== 'Completed').length;
@@ -392,6 +406,15 @@ export default function Dashboard() {
                         }`}>
                           {t.priority}
                         </span>
+                        {t.feedbackStatus && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                            t.feedbackStatus === 'On Track' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                            t.feedbackStatus === 'Needs Input' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                            t.feedbackStatus === 'Stuck' ? 'bg-red-500/10 text-red-500 border-red-500/20' : ''
+                          }`}>
+                            {t.feedbackStatus}
+                          </span>
+                        )}
                       </div>
                       {t.id.startsWith('Task') && (
                         <div className="text-[10px] text-indigo-400 font-bold mb-1">
@@ -609,6 +632,18 @@ export default function Dashboard() {
                           
                           {t.project && (
                              <div className="text-[10px] text-emerald-400/80 font-medium">#{t.project}</div>
+                          )}
+                          
+                          {t.feedbackStatus && (
+                            <div className="flex">
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                                t.feedbackStatus === 'On Track' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                t.feedbackStatus === 'Needs Input' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                t.feedbackStatus === 'Stuck' ? 'bg-red-500/10 text-red-500 border-red-500/20' : ''
+                              }`}>
+                                {t.feedbackStatus}
+                              </span>
+                            </div>
                           )}
                           
                           <div className="text-[10px] text-gray-500">

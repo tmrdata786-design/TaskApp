@@ -1,10 +1,33 @@
 {
   "entities": {
+    "Organization": {
+      "title": "Organization",
+      "description": "A tenant organization.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "adminEmail": { "type": "string", "format": "email" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "adminEmail", "created_at"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User mapping to an organization.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "orgId": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Manager", "User"] }
+      },
+      "required": ["email", "orgId", "role"]
+    },
     "Task": {
       "title": "Task",
       "description": "A task delegated to a team member.",
       "type": "object",
       "properties": {
+        "orgId": { "type": "string" },
         "area": { "type": "string" },
         "task_type": { "type": "string" },
         "project": { "type": "string" },
@@ -12,6 +35,7 @@
         "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
         "assignee": { "type": "string" },
         "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"] },
+        "feedbackStatus": { "type": "string", "enum": ["", "On Track", "Needs Input", "Stuck"] },
         "start_date": { "type": "string", "format": "date" },
         "end_date": { "type": "string", "format": "date" },
         "progress": { "type": "number" },
@@ -45,18 +69,19 @@
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["area", "task_type", "task", "priority", "assignee", "status", "progress", "created_at", "updated_at"]
+      "required": ["orgId", "area", "task_type", "task", "priority", "assignee", "status", "progress", "created_at", "updated_at"]
     },
     "Project": {
       "title": "Project",
       "description": "Project configuration.",
       "type": "object",
       "properties": {
+        "orgId": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "description", "created_at"]
+      "required": ["orgId", "name", "description", "created_at"]
     },
     "TaskFeedback": {
       "title": "TaskFeedback",
@@ -74,22 +99,24 @@
       "description": "Functional department and its task types.",
       "type": "object",
       "properties": {
+        "orgId": { "type": "string" },
         "name": { "type": "string" },
         "task_types": { "type": "array", "items": { "type": "string" } }
       },
-      "required": ["name", "task_types"]
+      "required": ["orgId", "name", "task_types"]
     },
     "Contact": {
       "title": "Contact",
       "description": "Team member for task assignment.",
       "type": "object",
       "properties": {
+        "orgId": { "type": "string" },
         "name": { "type": "string" },
         "email": { "type": "string" },
         "role": { "type": "string", "enum": ["User", "Manager"] },
         "area": { "type": "string" }
       },
-      "required": ["name"]
+      "required": ["orgId", "name", "email"]
     },
     "AdminInfo": {
       "title": "AdminInfo",
@@ -103,6 +130,14 @@
     }
   },
   "firestore": {
+    "/organizations/{orgId}": {
+      "schema": { "$ref": "#/entities/Organization" },
+      "description": "Tenant organizations."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User mapping for multi-tenancy."
+    },
     "/tasks/{taskId}": {
       "schema": { "$ref": "#/entities/Task" },
       "description": "Tasks created in the system."

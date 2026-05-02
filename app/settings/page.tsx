@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
 import { Loader2, Plus, Trash2, Save, Edit, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle, FolderKanban } from 'lucide-react';
@@ -11,7 +11,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'projects' | 'admin'>('areas');
   const [loadingConfig, setLoadingConfig] = useState(true);
   
-  const { isAdmin: isAuthorized, loading: adminLoading } = useAdmin();
+  const { isAdmin: isAuthorized, orgId, loading: adminLoading } = useAdmin();
   
   // States for data
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
@@ -32,34 +32,38 @@ export default function SettingsPage() {
   const [projectDescription, setProjectDescription] = useState('');
 
   useEffect(() => {
-    // Listen to Areas
-    const areasUnsub = onSnapshot(collection(db, 'areas'), (snap) => {
-      setAreas(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
-    });
-
-    // Listen to Contacts
-    const contactsUnsub = onSnapshot(collection(db, 'contacts'), (snap) => {
-      setContacts(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
-    });
-
-    // Listen to Projects
-    const projectsUnsub = onSnapshot(collection(db, 'projects'), (snap) => {
-      setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
-    });
-
-    // Get Admin Settings
+    // Get Admin Settings (needed for SuperAdmin or others)
     getDoc(doc(db, 'settings', 'admin')).then((snap) => {
       if (snap.exists()) {
         setAdmin(snap.data() as any);
       }
+    }).catch(e => {
+      console.error("Error fetching admin settings", e);
     }).finally(() => setLoadingConfig(false));
+
+    if (!orgId) return;
+    
+    // Listen to Areas
+    const areasUnsub = onSnapshot(query(collection(db, 'areas'), where('orgId', '==', orgId)), (snap) => {
+      setAreas(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+    }, (e) => handleFirestoreError(e, OperationType.LIST, 'areas'));
+
+    // Listen to Contacts
+    const contactsUnsub = onSnapshot(query(collection(db, 'contacts'), where('orgId', '==', orgId)), (snap) => {
+      setContacts(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+    }, (e) => handleFirestoreError(e, OperationType.LIST, 'contacts'));
+
+    // Listen to Projects
+    const projectsUnsub = onSnapshot(query(collection(db, 'projects'), where('orgId', '==', orgId)), (snap) => {
+      setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+    }, (e) => handleFirestoreError(e, OperationType.LIST, 'projects'));
 
     return () => {
       areasUnsub();
       contactsUnsub();
       projectsUnsub();
     };
-  }, []);
+  }, [orgId]);
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -78,8 +82,8 @@ export default function SettingsPage() {
   const addArea = async () => {
     if (!newArea.trim()) return;
     try {
-      const id = newArea.toLowerCase().replace(/\s+/g, '-');
-      await setDoc(doc(db, 'areas', id), { name: newArea, task_types: [] });
+      const id = `${newArea.toLowerCase().replace(/\s+/g, '-')}-${orgId}`;
+      await setDoc(doc(db, 'areas', id), { name: newArea, task_types: [], orgId });
       setNewArea('');
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'areas');
@@ -119,12 +123,13 @@ export default function SettingsPage() {
   const addContact = async () => {
     if (!contactName.trim()) return;
     try {
-      const id = contactName.toLowerCase().replace(/\s+/g, '-');
+      const id = `${contactName.toLowerCase().replace(/\s+/g, '-')}-${orgId}`;
       await setDoc(doc(db, 'contacts', id), { 
         name: contactName, 
         email: contactEmail,
         role: contactRole,
-        area: contactArea
+        area: contactArea,
+        orgId
       });
       setContactName('');
       setContactEmail('');
@@ -163,12 +168,13 @@ export default function SettingsPage() {
         }
       });
       const nextNum = maxNum + 1;
-      const nextId = `Project-${nextNum.toString().padStart(5, '0')}`;
+      const nextId = `Project-${nextNum.toString().padStart(5, '0')}-${orgId}`;
       
       await setDoc(doc(db, 'projects', nextId), { 
         name: projectName, 
         description: projectDescription,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        orgId
       });
       setProjectName('');
       setProjectDescription('');
@@ -192,7 +198,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loadingConfig || adminLoading) return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
+  if (adminLoading) return <div className="p-8 text-center text-gray-500">Checking permissions...</div>;
 
   if (!isAuthorized) {
     return (

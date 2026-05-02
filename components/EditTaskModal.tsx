@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection, arrayUnion, query, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestoreError';
 import { Loader2, Plus, Trash2, CheckCircle, Circle } from 'lucide-react';
@@ -10,7 +10,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<any>(null);
   const [originalForm, setOriginalForm] = useState<any>(null);
-  const { userContactName } = useAdmin();
+  const { userContactName, orgId } = useAdmin();
   
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
@@ -21,14 +21,15 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
 
   useEffect(() => {
     async function load() {
+      if (!orgId) return;
       try {
-        const areaSnap = await getDocs(collection(db, 'areas'));
+        const areaSnap = await getDocs(query(collection(db, 'areas'), where('orgId', '==', orgId)));
         setAreas(areaSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
 
-        const contactSnap = await getDocs(collection(db, 'contacts'));
+        const contactSnap = await getDocs(query(collection(db, 'contacts'), where('orgId', '==', orgId)));
         setContacts(contactSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
         
-        const projectSnap = await getDocs(collection(db, 'projects'));
+        const projectSnap = await getDocs(query(collection(db, 'projects'), where('orgId', '==', orgId)));
         setProjects(projectSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
 
         const taskSnap = await getDoc(doc(db, 'tasks', taskId));
@@ -46,7 +47,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
       }
     }
     load();
-  }, [taskId]);
+  }, [taskId, orgId]);
 
   const handleUpdate = (field: string, val: string | number) => {
     setForm((prev: any) => {
@@ -112,6 +113,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
         end_date: form.end_date || '',
         progress: form.progress !== undefined ? form.progress : 0,
         subtasks: form.subtasks || [],
+        feedbackStatus: form.feedbackStatus || '',
         updated_at: serverTimestamp()
       };
 
@@ -127,6 +129,9 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
       }
       if (originalForm.task !== form.task) {
         logEntries.push({ action: "Task description updated", timestamp: Date.now(), user: userIdent });
+      }
+      if (originalForm.feedbackStatus !== form.feedbackStatus) {
+        logEntries.push({ action: `Feedback status changed to ${form.feedbackStatus || 'None'}`, timestamp: Date.now(), user: userIdent });
       }
 
       if (logEntries.length > 0) {
@@ -247,7 +252,8 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
             </div>
           </div>
 
-            <div className="space-y-1.5 mt-3 border-t pt-3 dark:border-[#1F2937]">
+            <div className="grid grid-cols-2 gap-3 mt-3 border-t pt-3 dark:border-[#1F2937]">
+             <div className="space-y-1.5">
                <div className="flex items-center justify-between text-xs font-medium text-gray-500">
                  <label>Progress</label>
                  <span>{Math.round((form.progress || 0) * 100)}%</span>
@@ -256,8 +262,23 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
                  type="range" min="0" max="100" step="1" 
                  value={Math.round((form.progress || 0) * 100)} 
                  onChange={(e) => handleUpdate('progress', parseInt(e.target.value)/100)}
-                 className="w-full accent-indigo-500 cursor-pointer"
+                 className="w-full accent-indigo-500 cursor-pointer mt-1"
                />
+             </div>
+             
+             <div className="space-y-1.5">
+               <label className="text-xs font-medium text-gray-500">Feedback Status</label>
+               <select 
+                 value={form.feedbackStatus || ''} 
+                 onChange={e => handleUpdate('feedbackStatus', e.target.value)}
+                 className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-900 dark:text-white"
+               >
+                 <option value="">None</option>
+                 <option value="On Track">On Track</option>
+                 <option value="Needs Input">Needs Input</option>
+                 <option value="Stuck">Stuck</option>
+               </select>
+             </div>
             </div>
 
           <div className="flex justify-end gap-3 mt-6">

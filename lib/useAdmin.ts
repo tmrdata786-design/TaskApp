@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
+import { useAuth } from '../components/AuthProvider';
 
 export function useAdmin() {
+  const { user, orgId, orgRole, isSuperAdmin, loading: authLoading } = useAuth();
+  
   const [isAdmin, setIsAdmin] = useState(false);
   const [isManager, setIsManager] = useState(false);
   const [userArea, setUserArea] = useState<string | null>(null);
@@ -11,46 +13,51 @@ export function useAdmin() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user?.email) {
-        setIsAdmin(false);
-        setIsManager(false);
-        setUserArea(null);
-        setUserContactName(null);
-        setLoading(false);
-        return;
-      }
-      
+    if (authLoading) return;
+
+    if (!user || (!orgId && !isSuperAdmin)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsAdmin(false);
+      setIsManager(false);
+      setUserArea(null);
+      setUserContactName(null);
+      setLoading(false);
+      return;
+    }
+
+    if (isSuperAdmin) {
+      setIsAdmin(true);
+      setLoading(false);
+      return;
+    }
+
+    async function loadRoles() {
       let finalIsAdmin = false;
       let finalIsManager = false;
       let finalUserArea = null;
       let finalUserContactName = null;
 
-      if (user.email === 'tmrdata786@gmail.com') {
+      if (orgRole === 'Admin') {
         finalIsAdmin = true;
       }
 
       try {
-        const snap = await getDoc(doc(db, 'settings', 'admin'));
-        if (snap.exists()) {
-          const data = snap.data();
-          const emails = data.admin_emails || [];
-          if (emails.includes(user.email) || data.admin_email === user.email) {
-            finalIsAdmin = true;
-          }
-        }
-      } catch (error) {
-        console.error("Error checking admin status:", error);
-      }
-
-      try {
-        const contactSnap = await getDocs(collection(db, 'contacts'));
-        const contact = contactSnap.docs.find(d => d.data().email === user.email);
-        if (contact) {
-          finalUserContactName = contact.data().name;
-          if (contact.data().role === 'Manager') {
-            finalIsManager = true;
-            finalUserArea = contact.data().area;
+        if (orgId && user?.email) {
+          const q = query(
+            collection(db, 'contacts'), 
+            where('orgId', '==', orgId),
+            where('email', '==', user.email)
+          );
+          const contactSnap = await getDocs(q);
+          if (!contactSnap.empty) {
+            const contact = contactSnap.docs[0].data();
+            finalUserContactName = contact.name;
+            if (contact.role === 'Manager') {
+              finalIsManager = true;
+              finalUserArea = contact.area;
+            } else if (contact.role === 'Admin') {
+              finalIsAdmin = true;
+            }
           }
         }
       } catch (error) {
@@ -62,10 +69,11 @@ export function useAdmin() {
       setUserArea(finalUserArea);
       setUserContactName(finalUserContactName);
       setLoading(false);
-    });
+    }
 
-    return () => unsubscribe();
-  }, []);
+    loadRoles();
+  }, [user, orgId, orgRole, isSuperAdmin, authLoading]);
 
-  return { isAdmin, isManager, userArea, userContactName, loading };
+  // Expose orgId as well so other components can use it for querying/saving.
+  return { isAdmin, isManager, userArea, userContactName, orgId, isSuperAdmin, loading: loading || authLoading };
 }

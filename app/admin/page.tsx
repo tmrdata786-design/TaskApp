@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, writeBatch, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,7 @@ import { useAdmin } from '../../lib/useAdmin';
 
 export default function AdminEntry() {
   const router = useRouter();
-  const { isAdmin, isManager, userArea, userContactName, loading: adminLoading } = useAdmin();
+  const { isAdmin, isManager, userArea, userContactName, orgId, loading: adminLoading } = useAdmin();
   const isAuthorized = isAdmin || isManager;
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -38,31 +38,35 @@ export default function AdminEntry() {
 
   useEffect(() => {
     async function initData() {
+      if (!orgId) {
+        setLoadingConfig(false);
+        return;
+      }
       try {
-        const areaSnap = await getDocs(collection(db, 'areas'));
+        const areaSnap = await getDocs(query(collection(db, 'areas'), where('orgId', '==', orgId)));
         let areaList = areaSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
         
         // Seed initial data if empty
         if (areaList.length === 0) {
           const initialAreas = [
-            { id: 'sale', name: 'Sale', task_types: ['Sales', 'Marketing'] },
-            { id: 'hr', name: 'HR', task_types: ['HR', 'Admin'] },
-            { id: 'accounts', name: 'Accounts', task_types: ['Accounts', 'Finance'] },
-            { id: 'operations', name: 'Operations', task_types: ['Productions', 'Quality'] }
+            { id: `sale-${orgId}`, name: 'Sale', task_types: ['Sales', 'Marketing'], orgId },
+            { id: `hr-${orgId}`, name: 'HR', task_types: ['HR', 'Admin'], orgId },
+            { id: `accounts-${orgId}`, name: 'Accounts', task_types: ['Accounts', 'Finance'], orgId },
+            { id: `operations-${orgId}`, name: 'Operations', task_types: ['Productions', 'Quality'], orgId }
           ];
           const batch = writeBatch(db);
           for (const a of initialAreas) {
-            batch.set(doc(db, 'areas', a.id), { name: a.name, task_types: a.task_types });
+            batch.set(doc(db, 'areas', a.id), { name: a.name, task_types: a.task_types, orgId: a.orgId });
           }
           await batch.commit();
           areaList = initialAreas;
         }
         setAreas(areaList);
 
-        const contactSnap = await getDocs(collection(db, 'contacts'));
+        const contactSnap = await getDocs(query(collection(db, 'contacts'), where('orgId', '==', orgId)));
         setContacts(contactSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
         
-        const projectSnap = await getDocs(collection(db, 'projects'));
+        const projectSnap = await getDocs(query(collection(db, 'projects'), where('orgId', '==', orgId)));
         setProjects(projectSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
 
         // Set defaults
@@ -78,7 +82,7 @@ export default function AdminEntry() {
       }
     }
     initData();
-  }, [isAdmin, isManager, userArea]);
+  }, [isAdmin, isManager, userArea, orgId]);
 
   const handleUpdate = (field: string, val: string | number) => {
     setForm(prev => {
@@ -118,19 +122,18 @@ export default function AdminEntry() {
     try {
       const tasksRef = collection(db, 'tasks');
       
-      // Get all tasks to find the max number globally
-      const allTasksSnap = await getDocs(tasksRef);
+      // Get all tasks to find the max number globally (or within org)
+      const allTasksSnap = await getDocs(query(tasksRef, where('orgId', '==', orgId)));
       let maxNum = 0;
       allTasksSnap.forEach(doc => {
-        const match = doc.id.match(/^Task-(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1]);
-          if (num > maxNum) maxNum = num;
-        }
+        const match = doc.id.match(/^Task-(\d+)-/);
+        const matchOld = doc.id.match(/^Task-(\d+)$/);
+        const num = match ? parseInt(match[1]) : (matchOld ? parseInt(matchOld[1]) : 0);
+        if (num > maxNum) maxNum = num;
       });
       const nextNum = maxNum + 1;
       const formattedNum = nextNum.toString().padStart(6, '0');
-      const taskId = `Task-${formattedNum}`;
+      const taskId = `Task-${formattedNum}-${orgId}`;
 
       const newDoc = doc(db, 'tasks', taskId);
       const now = serverTimestamp();
@@ -138,6 +141,7 @@ export default function AdminEntry() {
       const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
       await setDoc(newDoc, {
         ...form,
+        orgId: orgId,
         created_at: now,
         updated_at: now,
         activityLog: [{ action: 'Task created', timestamp: Date.now(), user: userIdent }],
