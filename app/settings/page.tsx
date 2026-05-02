@@ -23,7 +23,6 @@ export default function SettingsPage() {
   const [editingContact, setEditingContact] = useState<{ id: string; name: string; email: string; role?: string; area?: string } | null>(null);
   const [editingProject, setEditingProject] = useState<{ id: string; name: string; description: string } | null>(null);
   const [newArea, setNewArea] = useState('');
-  const [newTaskType, setNewTaskType] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactRole, setContactRole] = useState('User');
@@ -90,16 +89,15 @@ export default function SettingsPage() {
     }
   };
 
-  const addTaskType = async (areaId: string) => {
-    if (!newTaskType.trim()) return;
+  const addTaskType = async (areaId: string, typeToAdd: string) => {
+    if (!typeToAdd.trim()) return;
     const area = areas.find(a => a.id === areaId);
     if (!area) return;
     try {
       await setDoc(doc(db, 'areas', areaId), { 
         ...area, 
-        task_types: [...area.task_types, newTaskType] 
+        task_types: [...area.task_types, typeToAdd.trim()] 
       });
-      setNewTaskType('');
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `areas/${areaId}`);
     }
@@ -300,15 +298,17 @@ export default function SettingsPage() {
                       className="flex-1 bg-transparent text-xs text-gray-600 dark:text-gray-400 outline-none"
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
-                          setNewTaskType(e.currentTarget.value);
-                          addTaskType(area.id);
-                          e.currentTarget.value = '';
+                          const val = e.currentTarget.value;
+                          if (val.trim()) {
+                            addTaskType(area.id, val);
+                            e.currentTarget.value = '';
+                          }
                         }
                       }}
                       onBlur={e => {
-                        if (e.target.value) {
-                          setNewTaskType(e.target.value);
-                          addTaskType(area.id);
+                        const val = e.target.value;
+                        if (val.trim()) {
+                          addTaskType(area.id, val);
                           e.target.value = '';
                         }
                       }}
