@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import Select from 'react-select';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, arrayUnion, query, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestoreError';
@@ -227,6 +228,41 @@ export default function Dashboard() {
   const allPriorities = ['High', 'Medium', 'Low'];
   const allTaskTypes = Array.from(new Set(tasks.map(t => t.task_type))).filter(Boolean);
 
+  const selectStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      boxShadow: 'none',
+      cursor: 'pointer',
+      minHeight: '38px',
+      '&:hover': { borderColor: 'transparent' }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--rs-bg)',
+      border: '1px solid',
+      borderColor: 'var(--rs-border)',
+      zIndex: 50
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? 'var(--rs-hover)' : 'transparent',
+      color: 'inherit',
+      '&:active': {
+        backgroundColor: 'var(--rs-active)'
+      }
+    })
+  };
+
   const filteredTasks = tasks.filter(t => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -291,54 +327,66 @@ export default function Dashboard() {
 
       {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
-          <select 
-            value={areaFilter} 
-            onChange={(e) => setAreaFilter(e.target.value)}
-            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
-          >
-            <option value="All">All Areas</option>
-            {allAreas.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <select 
-            value={projectFilter} 
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
-          >
-            <option value="All">All Projects</option>
-            {allProjects.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select 
-            value={assigneeFilter} 
-            onChange={(e) => setAssigneeFilter(e.target.value)}
-            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
-          >
-            <option value="All">All Assignees</option>
-            {allAssignees.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <select 
-            value={statusFilter} 
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
-          >
-            <option value="All">All Statuses</option>
-            {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select 
-            value={priorityFilter} 
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
-          >
-            <option value="All">All Priorities</option>
-            {allPriorities.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select 
-            value={taskTypeFilter} 
-            onChange={(e) => setTaskTypeFilter(e.target.value)}
-            className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-700 dark:text-gray-300 px-3 py-2 outline-none focus:border-indigo-500 transition"
-          >
-            <option value="All">All Task Types</option>
-            {allTaskTypes.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <div className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm min-w-[140px] focus-within:border-indigo-500 transition">
+            <Select
+              options={[{ value: 'All', label: 'All Areas' }, ...allAreas.map(a => ({ value: a, label: a }))]}
+              value={{ value: areaFilter, label: areaFilter === 'All' ? 'All Areas' : areaFilter }}
+              onChange={(opt: any) => setAreaFilter(opt?.value || 'All')}
+              placeholder="Area"
+              styles={selectStyles}
+              className="text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm min-w-[140px] focus-within:border-indigo-500 transition">
+            <Select
+              options={[{ value: 'All', label: 'All Projects' }, ...allProjects.map(p => ({ value: p, label: p }))]}
+              value={{ value: projectFilter, label: projectFilter === 'All' ? 'All Projects' : projectFilter }}
+              onChange={(opt: any) => setProjectFilter(opt?.value || 'All')}
+              placeholder="Project"
+              styles={selectStyles}
+              className="text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm min-w-[140px] focus-within:border-indigo-500 transition">
+            <Select
+              options={[{ value: 'All', label: 'All Assignees' }, ...allAssignees.map(a => ({ value: a, label: a }))]}
+              value={{ value: assigneeFilter, label: assigneeFilter === 'All' ? 'All Assignees' : assigneeFilter }}
+              onChange={(opt: any) => setAssigneeFilter(opt?.value || 'All')}
+              placeholder="Assignee"
+              styles={selectStyles}
+              className="text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm min-w-[140px] focus-within:border-indigo-500 transition">
+            <Select
+              options={[{ value: 'All', label: 'All Statuses' }, ...allStatuses.map(s => ({ value: s, label: s }))]}
+              value={{ value: statusFilter, label: statusFilter === 'All' ? 'All Statuses' : statusFilter }}
+              onChange={(opt: any) => setStatusFilter(opt?.value || 'All')}
+              placeholder="Status"
+              styles={selectStyles}
+              className="text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm min-w-[140px] focus-within:border-indigo-500 transition">
+            <Select
+              options={[{ value: 'All', label: 'All Priorities' }, ...allPriorities.map(p => ({ value: p, label: p }))]}
+              value={{ value: priorityFilter, label: priorityFilter === 'All' ? 'All Priorities' : priorityFilter }}
+              onChange={(opt: any) => setPriorityFilter(opt?.value || 'All')}
+              placeholder="Priority"
+              styles={selectStyles}
+              className="text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div className="bg-white dark:bg-[#11141A] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm min-w-[140px] focus-within:border-indigo-500 transition">
+            <Select
+              options={[{ value: 'All', label: 'All Task Types' }, ...allTaskTypes.map(t => ({ value: t, label: t }))]}
+              value={{ value: taskTypeFilter, label: taskTypeFilter === 'All' ? 'All Task Types' : taskTypeFilter }}
+              onChange={(opt: any) => setTaskTypeFilter(opt?.value || 'All')}
+              placeholder="Task Type"
+              styles={selectStyles}
+              className="text-gray-700 dark:text-gray-300"
+            />
+          </div>
 
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">Date Range:</span>

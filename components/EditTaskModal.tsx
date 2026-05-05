@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Select from 'react-select';
 import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection, arrayUnion, query, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/firestoreError';
@@ -15,6 +16,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [allTasks, setAllTasks] = useState<{ id: string; name: string }[]>([]);
   
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'activity'>('details');
@@ -31,6 +33,9 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
         
         const projectSnap = await getDocs(query(collection(db, 'projects'), where('orgId', '==', orgId)));
         setProjects(projectSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+
+        const tasksSnap = await getDocs(query(collection(db, 'tasks'), where('orgId', '==', orgId)));
+        setAllTasks(tasksSnap.docs.filter(d => d.id !== taskId).map(d => ({ id: d.id, name: d.data().task })));
 
         const taskSnap = await getDoc(doc(db, 'tasks', taskId));
         if (taskSnap.exists()) {
@@ -49,7 +54,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
     load();
   }, [taskId, orgId]);
 
-  const handleUpdate = (field: string, val: string | number) => {
+  const handleUpdate = (field: string, val: string | number | string[]) => {
     setForm((prev: any) => {
       let next = { ...prev, [field]: val };
       if (field === 'area') {
@@ -113,6 +118,7 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
         end_date: form.end_date || '',
         progress: form.progress !== undefined ? form.progress : 0,
         subtasks: form.subtasks || [],
+        dependencies: form.dependencies || [],
         feedbackStatus: form.feedbackStatus || '',
         updated_at: serverTimestamp()
       };
@@ -162,6 +168,41 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
   
   const activityLog = [...(form.activityLog || [])].sort((a: any, b: any) => b.timestamp - a.timestamp);
 
+  const selectStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      boxShadow: 'none',
+      cursor: 'pointer',
+      minHeight: '38px',
+      '&:hover': { borderColor: 'transparent' }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--rs-bg)',
+      border: '1px solid',
+      borderColor: 'var(--rs-border)',
+      zIndex: 50
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? 'var(--rs-hover)' : 'transparent',
+      color: 'inherit',
+      '&:active': {
+        backgroundColor: 'var(--rs-active)'
+      }
+    })
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#11141A] p-6 rounded-2xl border border-gray-200 dark:border-[#1F2937] w-full max-w-xl max-h-[90vh] overflow-y-auto flex flex-col">
@@ -207,40 +248,83 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Area</label>
-              <select value={form.area} onChange={e => handleUpdate('area', e.target.value)} className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-gray-900 dark:text-white">
-                {areas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-              </select>
+              <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                <Select
+                  options={areas.map(a => ({ value: a.name, label: a.name }))}
+                  value={form.area ? { value: form.area, label: form.area } : null}
+                  onChange={(opt: any) => handleUpdate('area', opt?.value || '')}
+                  styles={selectStyles}
+                  className="text-sm text-gray-900 dark:text-white"
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Task Type</label>
-              <select value={form.task_type} onChange={e => handleUpdate('task_type', e.target.value)} className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-gray-900 dark:text-white">
-                {taskTypes.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                <Select
+                  options={taskTypes.map(t => ({ value: t, label: t }))}
+                  value={form.task_type ? { value: form.task_type, label: form.task_type } : null}
+                  onChange={(opt: any) => handleUpdate('task_type', opt?.value || '')}
+                  styles={selectStyles}
+                  className="text-sm text-gray-900 dark:text-white"
+                />
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Project</label>
-              <select value={form.project || ''} onChange={e => handleUpdate('project', e.target.value)} className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-gray-900 dark:text-white">
-                <option value="">No Project</option>
-                {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-              </select>
+              <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                <Select
+                  options={[{ value: '', label: 'No Project' }, ...projects.map(p => ({ value: p.name, label: p.name }))]}
+                  value={form.project ? { value: form.project, label: form.project } : { value: '', label: 'No Project' }}
+                  onChange={(opt: any) => handleUpdate('project', opt?.value || '')}
+                  styles={selectStyles}
+                  className="text-sm text-gray-900 dark:text-white"
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Assignee</label>
-              <select value={form.assignee} onChange={e => handleUpdate('assignee', e.target.value)} className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-gray-900 dark:text-white">
-                {contacts.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
+              <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                <Select
+                  options={contacts.map(c => ({ value: c.name, label: c.name }))}
+                  value={form.assignee ? { value: form.assignee, label: form.assignee } : null}
+                  onChange={(opt: any) => handleUpdate('assignee', opt?.value || '')}
+                  styles={selectStyles}
+                  className="text-sm text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-gray-500">Predecessor (Dependency)</label>
+            <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+              <Select
+                options={[{ value: '', label: 'No Predecessor' }, ...allTasks.map(t => ({ value: t.id, label: `${t.name} (${t.id})` }))]}
+                value={form.dependencies?.[0] ? { value: form.dependencies[0], label: allTasks.find(t => t.id === form.dependencies[0])?.name || form.dependencies[0] } : { value: '', label: 'No Predecessor' }}
+                onChange={(opt: any) => handleUpdate('dependencies', opt?.value ? [opt.value] : [])}
+                styles={selectStyles}
+                className="text-sm text-gray-900 dark:text-white"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Priority</label>
-              <select value={form.priority} onChange={e => handleUpdate('priority', e.target.value)} className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-gray-900 dark:text-white">
-                {['High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                <Select
+                  options={['High', 'Medium', 'Low'].map(p => ({ value: p, label: p }))}
+                  value={form.priority ? { value: form.priority, label: form.priority } : null}
+                  onChange={(opt: any) => handleUpdate('priority', opt?.value || 'Medium')}
+                  styles={selectStyles}
+                  isSearchable={false}
+                  className="text-sm text-gray-900 dark:text-white"
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500">Start Date</label>
@@ -268,16 +352,21 @@ export default function EditTaskModal({ taskId, onClose }: { taskId: string, onC
              
              <div className="space-y-1.5">
                <label className="text-xs font-medium text-gray-500">Feedback Status</label>
-               <select 
-                 value={form.feedbackStatus || ''} 
-                 onChange={e => handleUpdate('feedbackStatus', e.target.value)}
-                 className="w-full px-3 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg text-sm text-gray-900 dark:text-white"
-               >
-                 <option value="">None</option>
-                 <option value="On Track">On Track</option>
-                 <option value="Needs Input">Needs Input</option>
-                 <option value="Stuck">Stuck</option>
-               </select>
+               <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                 <Select
+                   options={[
+                     { value: '', label: 'None' },
+                     { value: 'On Track', label: 'On Track' },
+                     { value: 'Needs Input', label: 'Needs Input' },
+                     { value: 'Stuck', label: 'Stuck' }
+                   ]}
+                   value={form.feedbackStatus ? { value: form.feedbackStatus, label: form.feedbackStatus } : { value: '', label: 'None' }}
+                   onChange={(opt: any) => handleUpdate('feedbackStatus', opt?.value || '')}
+                   styles={selectStyles}
+                   isSearchable={false}
+                   className="text-sm text-gray-900 dark:text-white"
+                 />
+               </div>
              </div>
             </div>
 

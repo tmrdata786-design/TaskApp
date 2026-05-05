@@ -7,6 +7,7 @@ interface GanttTask {
   start: Date;
   end: Date;
   color: string;
+  dependencies: string[];
 }
 
 interface GanttViewCustomProps {
@@ -30,7 +31,8 @@ export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
       name: t.task,
       start: startOfDay(new Date(t.start_date)),
       end: startOfDay(new Date(t.end_date)),
-      color: colorMap[t.priority] || 'bg-indigo-500 text-indigo-500'
+      color: colorMap[t.priority] || 'bg-indigo-500 text-indigo-500',
+      dependencies: t.dependencies || []
     }));
 
     if (valid.length === 0) {
@@ -90,6 +92,8 @@ export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
       ? Math.max(800, totalDays * 15)
       : Math.max(800, totalDays * 5);
 
+  const rowHeight = 40;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex bg-gray-100 dark:bg-[#1A1D23] p-1 rounded-xl w-fit">
@@ -123,7 +127,64 @@ export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
           
           {/* Right timeline */}
           <div className="flex-1 relative pb-10">
-            <div className="pt-8 flex flex-col">
+            <div className="pt-8 flex flex-col relative z-0">
+               {/* Arrows Layer */}
+               <svg 
+                className="absolute top-8 left-0 pointer-events-none overflow-visible"
+                width={timelineWidth}
+                height={parsedTasks.length * rowHeight}
+              >
+                <defs>
+                  <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+                    <polygon points="0 0, 6 2, 0 4" fill="#6366f1" />
+                  </marker>
+                </defs>
+                {parsedTasks.flatMap((t, idx) => 
+                  t.dependencies.map((depId: string) => {
+                    const depIdx = parsedTasks.findIndex(pt => pt.id === depId);
+                    if (depIdx === -1) return null;
+
+                    const depTask = parsedTasks[depIdx];
+                    
+                    const startX = ((differenceInDays(depTask.end, minDate) + 1) / totalDays) * timelineWidth;
+                    const startY = (depIdx * rowHeight) + (rowHeight / 2);
+                    
+                    const endX = (differenceInDays(t.start, minDate) / totalDays) * timelineWidth;
+                    const endY = (idx * rowHeight) + (rowHeight / 2);
+
+                    const curve = 10;
+                    
+                    if (startX < endX) {
+                      // Normal dependency (end before start)
+                      return (
+                        <path
+                          key={`${t.id}-${depId}`}
+                          d={`M ${startX} ${startY} L ${startX + curve} ${startY} L ${startX + curve} ${endY} L ${endX} ${endY}`}
+                          fill="none"
+                          stroke="#6366f1"
+                          strokeWidth="1.5"
+                          strokeOpacity="0.4"
+                          markerEnd="url(#arrowhead)"
+                        />
+                      );
+                    } else {
+                      // Overlapping or backwards (should not happen in valid plan but handle gracefully)
+                       return (
+                        <path
+                          key={`${t.id}-${depId}`}
+                          d={`M ${startX} ${startY} L ${startX + curve} ${startY} L ${startX + curve} ${startY + rowHeight/2} L ${endX - curve} ${startY + rowHeight/2} L ${endX - curve} ${endY} L ${endX} ${endY}`}
+                          fill="none"
+                          stroke="#ef4444"
+                          strokeWidth="1.5"
+                          strokeOpacity="0.4"
+                          markerEnd="url(#arrowhead)"
+                        />
+                      );
+                    }
+                  })
+                )}
+              </svg>
+
               {parsedTasks.map(t => {
                 const startOffset = differenceInDays(t.start, minDate);
                 const duration = Math.max(1, differenceInDays(t.end, t.start) + 1);
@@ -133,8 +194,9 @@ export function GanttViewCustom({ tasks }: GanttViewCustomProps) {
                 return (
                   <div key={t.id} className="h-10 relative border-b border-gray-100 dark:border-[#1F2937]/50">
                     <div 
-                      className={`absolute top-2 bottom-2 rounded-md ${t.color.split(' ')[0]}`}
+                      className={`absolute top-2 bottom-2 rounded-md ${t.color.split(' ')[0]} opacity-80 shadow-sm transition-all hover:opacity-100 cursor-pointer`}
                       style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                      title={t.name}
                     />
                   </div>
                 );

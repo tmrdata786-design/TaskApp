@@ -1,3 +1,18 @@
 @import "tailwindcss";
 
+@layer base {
+  :root {
+    --rs-bg: #FFFFFF;
+    --rs-border: #E5E7EB;
+    --rs-hover: #F3F4F6;
+    --rs-active: #E5E7EB;
+  }
+  .dark {
+    --rs-bg: #1A1D23;
+    --rs-border: #1F2937;
+    --rs-hover: #1F2937;
+    --rs-active: #374151;
+  }
+}
+
 @custom-variant dark (&:where(.dark, .dark *));

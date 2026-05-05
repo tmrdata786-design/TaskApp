@@ -1,23 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Select from 'react-select';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
 import { Loader2, Plus, Trash2, Save, Edit, User, MapPin, ShieldCheck, AlertTriangle, CheckCircle, FolderKanban } from 'lucide-react';
 import { useAdmin } from '../../lib/useAdmin';
+import SaasAdminConsole from '../../components/SaasAdminConsole';
+import { useAuth } from '../../components/AuthProvider';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'projects' | 'admin'>('areas');
+  const [activeTab, setActiveTab] = useState<'areas' | 'contacts' | 'projects' | 'admin' | 'saas'>('areas');
   const [loadingConfig, setLoadingConfig] = useState(true);
   
-  const { isAdmin: isAuthorized, orgId, loading: adminLoading } = useAdmin();
+  const { isAdmin: isAuthorized, orgId: contextOrgId, loading: adminLoading } = useAdmin();
+  const { isSuperAdmin } = useAuth();
+  
+  // For super admin selection
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
+
+  // Effective Org Id
+  const orgId = isSuperAdmin ? selectedOrgId : contextOrgId;
   
   // States for data
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string; role?: string; area?: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string; description: string; created_at: string }[]>([]);
   const [admin, setAdmin] = useState<any>({ developer_name: 'Umar Latif', company_name: 'TM Rubber', admin_email: '', admin_emails: [] });
+  const [currentOrg, setCurrentOrg] = useState<any>(null);
 
   // Form states
   const [editingContact, setEditingContact] = useState<{ id: string; name: string; email: string; role?: string; area?: string } | null>(null);
@@ -31,7 +43,7 @@ export default function SettingsPage() {
   const [projectDescription, setProjectDescription] = useState('');
 
   useEffect(() => {
-    // Get Admin Settings (needed for SuperAdmin or others)
+    // Get Admin Settings
     getDoc(doc(db, 'settings', 'admin')).then((snap) => {
       if (snap.exists()) {
         setAdmin(snap.data() as any);
@@ -40,7 +52,34 @@ export default function SettingsPage() {
       console.error("Error fetching admin settings", e);
     }).finally(() => setLoadingConfig(false));
 
-    if (!orgId) return;
+    // For Super Admin: Fetch all Orgs to allow selection
+    if (isSuperAdmin) {
+      const unsub = onSnapshot(collection(db, 'organizations'), (snap) => {
+        setOrganizations(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+      });
+      return () => unsub();
+    }
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!orgId) {
+      setTimeout(() => {
+        setAreas([]);
+        setContacts([]);
+        setProjects([]);
+        setCurrentOrg(null);
+      }, 0);
+      return;
+    }
+    
+    // Listen to current organization
+    const orgUnsub = onSnapshot(doc(db, 'organizations', orgId), (docSnap) => {
+      if (docSnap.exists()) {
+        setCurrentOrg({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        setCurrentOrg(null);
+      }
+    }, (e) => console.error("Error fetching organization", e));
     
     // Listen to Areas
     const areasUnsub = onSnapshot(query(collection(db, 'areas'), where('orgId', '==', orgId)), (snap) => {
@@ -61,6 +100,7 @@ export default function SettingsPage() {
       areasUnsub();
       contactsUnsub();
       projectsUnsub();
+      orgUnsub();
     };
   }, [orgId]);
 
@@ -80,10 +120,15 @@ export default function SettingsPage() {
 
   const addArea = async () => {
     if (!newArea.trim()) return;
+    if (!orgId) {
+      alert("Please select or join an organization first.");
+      return;
+    }
     try {
       const id = `${newArea.toLowerCase().replace(/\s+/g, '-')}-${orgId}`;
       await setDoc(doc(db, 'areas', id), { name: newArea, task_types: [], orgId });
       setNewArea('');
+      alert("Area added successfully!");
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'areas');
     }
@@ -120,6 +165,20 @@ export default function SettingsPage() {
 
   const addContact = async () => {
     if (!contactName.trim()) return;
+    if (!orgId) {
+      alert("Please select or join an organization first.");
+      return;
+    }
+
+    if (currentOrg) {
+      const plan = currentOrg.plan || 'trial';
+      const maxUsers = { trial: 1, basic: 5, regular: 10, business: 25, enterprise: 100 }[plan as string] || 1;
+      if (contacts.length >= maxUsers) {
+        alert(`Your current plan (${plan.toUpperCase()}) is limited to ${maxUsers} users.\n\nTo add more users, please upgrade by contacting us on WhatsApp at +923218833616.`);
+        return;
+      }
+    }
+
     try {
       const id = `${contactName.toLowerCase().replace(/\s+/g, '-')}-${orgId}`;
       await setDoc(doc(db, 'contacts', id), { 
@@ -127,12 +186,23 @@ export default function SettingsPage() {
         email: contactEmail,
         role: contactRole,
         area: contactArea,
-        orgId
+        orgId: orgId
       });
+      
+      if (contactEmail) {
+        const userId = contactEmail.replace(/[@.]/g, '_');
+        await setDoc(doc(db, 'users', userId), {
+          email: contactEmail,
+          orgId: orgId,
+          role: contactRole
+        });
+      }
+
       setContactName('');
       setContactEmail('');
       setContactRole('User');
       setContactArea('');
+      alert("Contact added successfully!");
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'contacts');
     }
@@ -147,14 +217,38 @@ export default function SettingsPage() {
         role: editingContact.role || 'User',
         area: editingContact.area || ''
       });
+      if (editingContact.email) {
+        const userId = editingContact.email.replace(/[@.]/g, '_');
+        await setDoc(doc(db, 'users', userId), {
+          email: editingContact.email,
+          orgId: orgId,
+          role: editingContact.role || 'User'
+        });
+      }
       setEditingContact(null);
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `contacts/${editingContact.id}`);
     }
   };
 
+  const deleteContact = async (c: any) => {
+    try {
+      await deleteDoc(doc(db, 'contacts', c.id));
+      if (c.email) {
+        const userId = c.email.replace(/[@.]/g, '_');
+        await deleteDoc(doc(db, 'users', userId));
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `contacts/${c.id}`);
+    }
+  };
+
   const addProject = async () => {
     if (!projectName.trim()) return;
+    if (!orgId) {
+      alert("Please select or join an organization first.");
+      return;
+    }
     try {
       // Find max project number
       let maxNum = 0;
@@ -172,10 +266,11 @@ export default function SettingsPage() {
         name: projectName, 
         description: projectDescription,
         created_at: new Date().toISOString(),
-        orgId
+        orgId: orgId
       });
       setProjectName('');
       setProjectDescription('');
+      alert("Project added successfully!");
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, 'projects');
     }
@@ -198,6 +293,41 @@ export default function SettingsPage() {
 
   if (adminLoading) return <div className="p-8 text-center text-gray-500">Checking permissions...</div>;
 
+  const selectStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      boxShadow: 'none',
+      cursor: 'pointer',
+      minHeight: '38px',
+      '&:hover': { borderColor: 'transparent' }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--rs-bg)',
+      border: '1px solid',
+      borderColor: 'var(--rs-border)',
+      zIndex: 50
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? 'var(--rs-hover)' : 'transparent',
+      color: 'inherit',
+      '&:active': {
+        backgroundColor: 'var(--rs-active)'
+      }
+    })
+  };
+
   if (!isAuthorized) {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
@@ -218,13 +348,32 @@ export default function SettingsPage() {
     <div className="pb-20 space-y-6">
       <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Settings & Configuration</h1>
 
+      {isSuperAdmin && (
+        <div className="bg-[#ffca28]/10 border border-[#ffca28]/20 p-4 rounded-2xl mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-bold text-[#ffca28] uppercase tracking-wider">Super Admin Control</h4>
+            <p className="text-xs text-gray-400">Select an organization to manage its settings.</p>
+          </div>
+          <div className="bg-[#1A1D23] border border-[#2D3139] rounded-xl text-sm min-w-[250px]">
+            <Select
+              options={organizations.map(org => ({ value: org.id, label: org.name }))}
+              value={selectedOrgId ? { value: selectedOrgId, label: organizations.find(o => o.id === selectedOrgId)?.name || selectedOrgId } : null}
+              onChange={(opt: any) => setSelectedOrgId(opt?.value || null)}
+              placeholder="Select Organization"
+              styles={selectStyles}
+              className="text-white"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex bg-white dark:bg-[#11141A] p-1 rounded-xl border border-gray-200 dark:border-[#1F2937]">
         <button 
           onClick={() => setActiveTab('areas')}
           className={`flex-1 py-2 text-xs font-medium rounded-lg transition ${activeTab === 'areas' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`}
         >
-          Areas (Tab 1)
+          Area/Task Type
         </button>
         <button 
           onClick={() => setActiveTab('contacts')}
@@ -244,6 +393,14 @@ export default function SettingsPage() {
         >
           Admin
         </button>
+        {isSuperAdmin && (
+          <button 
+            onClick={() => setActiveTab('saas')}
+            className={`flex-1 py-2 text-xs font-medium rounded-lg transition ${activeTab === 'saas' ? 'bg-[#ffca28] text-gray-900 shadow-lg' : 'text-gray-500 hover:text-gray-700 dark:text-gray-300'}`}
+          >
+            SaaS Options
+          </button>
+        )}
       </div>
 
       {/* Tab: Areas */}
@@ -262,8 +419,9 @@ export default function SettingsPage() {
                 className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none"
               />
               <button 
+                type="button"
                 onClick={addArea}
-                className="bg-indigo-600 hover:bg-indigo-700 text-gray-900 dark:text-white p-2 rounded-xl transition"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl transition"
               >
                 <Plus size={20} />
               </button>
@@ -347,22 +505,29 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <select
-                  value={editingContact ? (editingContact.area || '') : contactArea}
-                  onChange={e => editingContact ? setEditingContact({...editingContact, area: e.target.value}) : setContactArea(e.target.value)}
-                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-900 dark:text-white outline-none"
-                >
-                  <option value="">Select Area</option>
-                  {areas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-                </select>
-                <select 
-                  value={editingContact ? (editingContact.role || 'User') : contactRole}
-                  onChange={e => editingContact ? setEditingContact({...editingContact, role: e.target.value}) : setContactRole(e.target.value)}
-                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl text-sm text-gray-900 dark:text-white outline-none"
-                >
-                  <option value="User">User</option>
-                  <option value="Manager">Manager</option>
-                </select>
+                <div className="flex-1 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                  <Select
+                    options={areas.map(a => ({ value: a.name, label: a.name }))}
+                    value={editingContact ? (editingContact.area ? { value: editingContact.area, label: editingContact.area } : null) : (contactArea ? { value: contactArea, label: contactArea } : null)}
+                    onChange={(opt: any) => editingContact ? setEditingContact({...editingContact, area: opt?.value || ''}) : setContactArea(opt?.value || '')}
+                    placeholder="Select Area"
+                    styles={selectStyles}
+                    className="text-sm text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div className="flex-1 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+                  <Select
+                    options={[
+                      { value: 'User', label: 'User' },
+                      { value: 'Manager', label: 'Manager' }
+                    ]}
+                    value={editingContact ? { value: editingContact.role || 'User', label: editingContact.role || 'User' } : { value: contactRole, label: contactRole }}
+                    onChange={(opt: any) => editingContact ? setEditingContact({...editingContact, role: opt?.value || 'User'}) : setContactRole(opt?.value || 'User')}
+                    styles={selectStyles}
+                    isSearchable={false}
+                    className="text-sm text-gray-900 dark:text-white"
+                  />
+                </div>
                 {editingContact ? (
                   <div className="flex gap-2 shrink-0">
                     <button 
@@ -380,8 +545,9 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <button 
+                    type="button"
                     onClick={addContact}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-gray-900 dark:text-white px-4 py-2 rounded-xl transition shrink-0"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition shrink-0"
                   >
                     <Plus size={20} />
                   </button>
@@ -412,7 +578,7 @@ export default function SettingsPage() {
                     <Edit size={16} />
                   </button>
                   <button 
-                    onClick={() => deleteDoc(doc(db, 'contacts', c.id))}
+                    onClick={() => deleteContact(c)}
                     className="p-2 text-gray-600 hover:text-red-500 transition"
                     title="Delete Contact"
                   >
@@ -466,8 +632,9 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <button 
+                    type="button"
                     onClick={addProject}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-gray-900 dark:text-white px-4 py-2 rounded-xl transition flex items-center shrink-0"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition flex items-center shrink-0"
                   >
                     <Plus size={20} className="mr-1" /> Add
                   </button>
@@ -609,6 +776,12 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      {activeTab === 'saas' && isSuperAdmin && (
+        <div className="space-y-6">
+          <SaasAdminConsole />
+        </div>
+      )}
+
     </div>
   );
 }

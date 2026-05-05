@@ -67,7 +67,11 @@
         "flag": { "type": "string" },
         "feedback": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "required": ["orgId", "area", "task_type", "task", "priority", "assignee", "status", "progress", "created_at", "updated_at"]
     },

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Select from 'react-select';
 import { collection, doc, setDoc, getDocs, writeBatch, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/firestoreError';
@@ -19,6 +20,7 @@ export default function AdminEntry() {
   const [areas, setAreas] = useState<{ id: string; name: string; task_types: string[] }[]>([]);
   const [contacts, setContacts] = useState<{ id: string; name: string; role?: string; area?: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [allTasks, setAllTasks] = useState<{ id: string; task: string }[]>([]);
 
   const [form, setForm] = useState({
     area: '',
@@ -33,7 +35,8 @@ export default function AdminEntry() {
     end_date: '',
     notes: '',
     flag: '',
-    feedback: ''
+    feedback: '',
+    predecessorId: ''
   });
 
   useEffect(() => {
@@ -68,6 +71,9 @@ export default function AdminEntry() {
         
         const projectSnap = await getDocs(query(collection(db, 'projects'), where('orgId', '==', orgId)));
         setProjects(projectSnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+
+        const tasksSnap = await getDocs(query(collection(db, 'tasks'), where('orgId', '==', orgId)));
+        setAllTasks(tasksSnap.docs.map(d => ({ id: d.id, task: d.data().task })));
 
         // Set defaults
         setForm(prev => ({
@@ -139,8 +145,10 @@ export default function AdminEntry() {
       const now = serverTimestamp();
       
       const userIdent = userContactName || auth.currentUser?.email || 'Unknown';
+      const { predecessorId, ...restForm } = form;
       await setDoc(newDoc, {
-        ...form,
+        ...restForm,
+        dependencies: predecessorId ? [predecessorId] : [],
         orgId: orgId,
         created_at: now,
         updated_at: now,
@@ -177,6 +185,39 @@ export default function AdminEntry() {
   const currentArea = areas.find(a => a.name === form.area);
   const taskTypes = currentArea?.task_types || [];
 
+  const selectStyles = {
+    control: (base: any) => ({
+      ...base,
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      boxShadow: 'none',
+      '&:hover': { borderColor: 'transparent' }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'inherit'
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--rs-bg)',
+      border: '1px solid',
+      borderColor: 'var(--rs-border)',
+      zIndex: 50
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isFocused ? 'var(--rs-hover)' : 'transparent',
+      color: 'inherit',
+      '&:active': {
+        backgroundColor: 'var(--rs-active)'
+      }
+    })
+  };
+
   return (
     <div className="pb-20">
       <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Delegate Task</h1>
@@ -191,50 +232,74 @@ export default function AdminEntry() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5 col-span-2">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Assignee</label>
-            <select 
-              value={form.assignee}
-              onChange={e => handleUpdate('assignee', e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
-            >
-              <option value="">Select Assignee</option>
-              {contacts.filter(c => isAdmin || (isManager && c.area === userArea && (c.role === 'User' || !c.role))).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
+            <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+              <Select
+                options={contacts
+                  .filter(c => isAdmin || (isManager && c.area === userArea && (c.role === 'User' || !c.role)))
+                  .map(c => ({ value: c.name, label: c.name }))
+                }
+                value={form.assignee ? { value: form.assignee, label: form.assignee } : null}
+                onChange={(opt: any) => handleUpdate('assignee', opt?.value || '')}
+                placeholder="Select Assignee"
+                styles={selectStyles}
+                className="text-sm text-gray-900 dark:text-white"
+              />
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Area</label>
-            <select 
-              value={form.area} 
-              onChange={e => handleUpdate('area', e.target.value)}
-              disabled={true}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white disabled:opacity-50 cursor-not-allowed"
-            >
-              { form.area ? <option value={form.area}>{form.area}</option> : <option value="">Auto-detected Area</option> }
-            </select>
+            <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl opacity-50 cursor-not-allowed">
+              <Select
+                value={form.area ? { value: form.area, label: form.area } : null}
+                isDisabled={true}
+                placeholder="Auto-detected Area"
+                styles={selectStyles}
+                className="text-sm text-gray-900 dark:text-white"
+              />
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Task Type</label>
-            <select 
-              value={form.task_type} 
-              onChange={e => handleUpdate('task_type', e.target.value)}
-              disabled={!form.area}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white disabled:opacity-50"
-            >
-              <option value="">Select task type</option>
-              {taskTypes.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <div className={`bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition ${!form.area ? 'opacity-50' : ''}`}>
+              <Select
+                options={taskTypes.map(t => ({ value: t, label: t }))}
+                value={form.task_type ? { value: form.task_type, label: form.task_type } : null}
+                onChange={(opt: any) => handleUpdate('task_type', opt?.value || '')}
+                isDisabled={!form.area}
+                placeholder="Select task type"
+                styles={selectStyles}
+                className="text-sm text-gray-900 dark:text-white"
+              />
+            </div>
           </div>
         </div>
 
         <div className="space-y-1.5">
           <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Project</label>
-          <select 
-            value={form.project} 
-            onChange={e => handleUpdate('project', e.target.value)}
-            className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
-          >
-            <option value="">No Project</option>
-            {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-          </select>
+          <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+            <Select
+              options={[{ value: '', label: 'No Project' }, ...projects.map(p => ({ value: p.name, label: p.name }))]}
+              value={form.project ? { value: form.project, label: form.project } : { value: '', label: 'No Project' }}
+              onChange={(opt: any) => handleUpdate('project', opt?.value || '')}
+              placeholder="Select Project"
+              styles={selectStyles}
+              className="text-sm text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Predecessor (Dependency)</label>
+          <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+            <Select
+              options={[{ value: '', label: 'No Predecessor' }, ...allTasks.map(t => ({ value: t.id, label: `${t.task} (${t.id})` }))]}
+              value={form.predecessorId ? { value: form.predecessorId, label: allTasks.find(t => t.id === form.predecessorId)?.task } : { value: '', label: 'No Predecessor' }}
+              onChange={(opt: any) => handleUpdate('predecessorId', opt?.value || '')}
+              placeholder="Select Predecessor"
+              styles={selectStyles}
+              className="text-sm text-gray-900 dark:text-white"
+            />
+          </div>
         </div>
 
         <div className="space-y-1.5">
@@ -250,15 +315,19 @@ export default function AdminEntry() {
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1.5 min-w-0">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Priority</label>
-            <select 
-              value={form.priority}
-              onChange={e => handleUpdate('priority', e.target.value)}
-              className="w-full px-4 py-2.5 bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition text-gray-900 dark:text-white"
-            >
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
+            <div className="bg-gray-100 dark:bg-[#0B0D10] border border-gray-200 dark:border-[#1F2937] rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
+              <Select
+                options={[
+                  { value: 'High', label: 'High' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'Low', label: 'Low' }
+                ]}
+                value={{ value: form.priority, label: form.priority }}
+                onChange={(opt: any) => handleUpdate('priority', opt?.value || 'High')}
+                styles={selectStyles}
+                className="text-sm text-gray-900 dark:text-white"
+              />
+            </div>
           </div>
           <div className="space-y-1.5 min-w-0">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">Start Date</label>
