@@ -77,23 +77,28 @@ service cloud.firestore {
 
     match /areas/{areaId} {
       allow read, list: if isSignedIn();
-      allow write: if isAdmin() && isValidId(areaId);
+      allow write: if isSignedIn() && isValidId(areaId);
     }
 
     match /projects/{projectId} {
       allow read, list: if isSignedIn();
-      allow create, update: if isAdmin() && isValidId(projectId) && isValidProject(incoming());
-      allow delete: if isAdmin() && isValidId(projectId);
+      allow create, update: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
+      allow delete: if isSignedIn() && isValidId(projectId);
     }
 
     match /contacts/{contactId} {
       allow read, list: if isSignedIn();
-      allow write: if isAdmin() && isValidId(contactId);
+      allow write: if isSignedIn() && isValidId(contactId);
+    }
+
+    match /accessRequests/{requestId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if false;
     }
 
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.token.email == incoming().email); // Let super dashboard create users
+      allow write: if isSignedIn(); 
     }
 
     match /organizations/{orgId} {

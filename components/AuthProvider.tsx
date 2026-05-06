@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -36,6 +36,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const authModeRef = useRef(authMode);
+  useEffect(() => {
+    authModeRef.current = authMode;
+  }, [authMode]);
+
+  const [whatsapp, setWhatsapp] = useState('');
+  const [requestSent, setRequestSent] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
+
+  const handleRequestAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!whatsapp.trim() || !user?.email) return;
+    setIsRequesting(true);
+    try {
+      const { addDoc, collection } = await import('firebase/firestore');
+      await addDoc(collection(db, 'accessRequests'), {
+        email: user.email,
+        whatsapp: whatsapp.trim(),
+        createdAt: new Date().toISOString()
+      });
+      setRequestSent(true);
+    } catch(err) {
+      console.error(err);
+      alert("Failed to send request.");
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (!u) {
@@ -78,13 +107,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(u);
           setAccessDenied(false);
         } else {
-          setUser(u);
-          setAccessDenied(true);
+          if (authModeRef.current === 'signin') {
+            await auth.signOut();
+            setError("Your email is not registered to an Organization. Please use Sign Up to request access.");
+            setAuthMode('signup');
+            setLoading(false);
+            return;
+          } else {
+            setUser(u);
+            setAccessDenied(true);
+          }
         }
       } catch (err) {
         console.error("Error fetching user org:", err);
-        setUser(u);
-        setAccessDenied(true);
+        if (authModeRef.current === 'signin') {
+          await auth.signOut();
+          setError("An error occurred. Please use Sign Up to request access.");
+          setAuthMode('signup');
+          setLoading(false);
+          return;
+        } else {
+          setUser(u);
+          setAccessDenied(true);
+        }
       }
       
       setLoading(false);
@@ -178,20 +223,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0B0D10] text-gray-100 p-4">
         <div className="bg-[#11141A] border border-[#1F2937] p-8 rounded-2xl shadow-sm text-center max-w-xl w-full mx-auto">
           <div className="flex justify-center mb-6">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white shadow-lg bg-red-600 text-xl">X</div>
+            <div className="px-4 py-2 rounded-lg flex items-center justify-center font-bold text-white shadow-lg bg-indigo-600 text-xl">Promo ERP</div>
           </div>
-          <h2 className="text-2xl font-bold mb-2 text-white">Access Denied</h2>
-          <p className="text-gray-400 mb-6">Your email ({user.email}) is not registered to any Organization. Contact your administrator.</p>
+          <h2 className="text-2xl font-bold mb-2 text-white">Request Access</h2>
+          <p className="text-gray-400 mb-6">Your email ({user.email}) is currently not registered. Please provide your WhatsApp number to request access from the developer.</p>
           
+          {requestSent ? (
+            <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-sm p-4 rounded-xl mb-6 text-left">
+              Request sent successfully! The developer will contact you soon.
+            </div>
+          ) : (
+            <form onSubmit={handleRequestAccess} className="mb-6 text-left">
+              <label className="block text-sm font-medium text-gray-400 mb-2">WhatsApp Number</label>
+              <input
+                type="text"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="+1 234 567 8900"
+                className="w-full bg-[#0B0D10] border border-[#1F2937] text-white rounded-lg px-4 py-3 mb-4 focus:outline-none focus:border-indigo-500"
+                required
+              />
+              <button
+                type="submit"
+                disabled={isRequesting || !whatsapp.trim()}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium py-3 px-4 rounded-xl transition flex items-center justify-center"
+              >
+                {isRequesting ? <LoaderCircle className="w-5 h-5 animate-spin" /> : 'Send Request'}
+              </button>
+            </form>
+          )}
+
           <button 
             onClick={signOut}
             className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 px-4 rounded-xl border border-gray-700 transition mb-6"
           >
-            Sign out
+            Sign out / Cancel
           </button>
 
           <div className="text-left border-t border-[#1F2937] pt-6 mt-2">
-            <h3 className="text-xl font-bold text-white mb-2">Please contact developers to get the Web App</h3>
+            <h3 className="text-xl font-bold text-white mb-2">Developer Details</h3>
             <h4 className="text-lg font-bold text-indigo-400 mt-4 mb-2">Promo ERP</h4>
             
             <h5 className="font-bold text-gray-300 mt-4">Description</h5>

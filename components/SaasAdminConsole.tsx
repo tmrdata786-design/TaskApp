@@ -243,7 +243,7 @@ export default function SaasAdminConsole() {
       </div>
 
       <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto min-h-[400px]">
+        <div className="overflow-x-auto min-h-[800px]">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 border-b">
               <tr>

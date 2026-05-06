@@ -125,7 +125,7 @@ export default function SettingsPage() {
       return;
     }
     try {
-      const id = `${newArea.toLowerCase().replace(/\s+/g, '-')}-${orgId}`;
+      const id = `${newArea.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${orgId}`;
       await setDoc(doc(db, 'areas', id), { name: newArea, task_types: [], orgId });
       setNewArea('');
       alert("Area added successfully!");
@@ -180,7 +180,7 @@ export default function SettingsPage() {
     }
 
     try {
-      const id = `${contactName.toLowerCase().replace(/\s+/g, '-')}-${orgId}`;
+      const id = `${contactName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${orgId}`;
       await setDoc(doc(db, 'contacts', id), { 
         name: contactName, 
         email: contactEmail,
