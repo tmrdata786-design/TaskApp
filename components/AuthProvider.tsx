@@ -129,13 +129,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0B0D10] text-gray-100 p-4">
         <div className="bg-[#11141A] border border-[#1F2937] p-8 rounded-2xl shadow-sm text-center max-w-sm w-full mx-auto">
           <div className="flex justify-center mb-6">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white shadow-lg bg-indigo-600 text-xl">TM</div>
+            <div className="px-4 py-2 rounded-lg flex items-center justify-center font-bold text-white shadow-lg bg-indigo-600 text-xl">Promo ERP</div>
           </div>
           <h2 className="text-2xl font-bold mb-2 text-white">{authMode === 'signin' ? 'Sign In' : 'Sign Up'}</h2>
           <p className="text-gray-400 mb-6">
             {authMode === 'signin' 
-              ? 'Access your TM Rubber task tracking dashboard.' 
-              : 'Create your account via Google to join TM Rubber.'}
+              ? 'Access your Project Management and Task Tracking Dashboard.' 
+              : 'Create your account via Google to join Promo ERP Project Management App'}
           </p>
           
           <div className="flex mb-6 bg-[#0B0D10] p-1 rounded-xl border border-[#1F2937]">
@@ -176,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (accessDenied && !isSuperAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0B0D10] text-gray-100 p-4">
-        <div className="bg-[#11141A] border border-[#1F2937] p-8 rounded-2xl shadow-sm text-center max-w-sm w-full mx-auto">
+        <div className="bg-[#11141A] border border-[#1F2937] p-8 rounded-2xl shadow-sm text-center max-w-xl w-full mx-auto">
           <div className="flex justify-center mb-6">
             <div className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white shadow-lg bg-red-600 text-xl">X</div>
           </div>
@@ -185,10 +185,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           <button 
             onClick={signOut}
-            className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 px-4 rounded-xl border border-gray-700 transition"
+            className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 px-4 rounded-xl border border-gray-700 transition mb-6"
           >
             Sign out
           </button>
+
+          <div className="text-left border-t border-[#1F2937] pt-6 mt-2">
+            <h3 className="text-xl font-bold text-white mb-2">Please contact developers to get the Web App</h3>
+            <h4 className="text-lg font-bold text-indigo-400 mt-4 mb-2">Promo ERP</h4>
+            
+            <h5 className="font-bold text-gray-300 mt-4">Description</h5>
+            <p className="text-sm text-gray-400 mt-1 leading-relaxed">
+              Promo ERP is a dedicated Enterprise Resource Planning (ERP) service provider specializing in scalable, feature-rich solutions designed for businesses of all sizes.
+            </p>
+            <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+              Our mission is to synchronize your company operations by integrating essential functions like finance, inventory, and sales into a single, unified platform. By offering tiered packages, we ensure that every client receives the precise level of automation and functionality required for their current scale and growth trajectory.
+            </p>
+            <p className="text-sm text-gray-400 mt-2 font-medium">
+              Now we also offer customization, integrations, Custom Apps and AI Automation
+            </p>
+
+            <h5 className="font-bold text-gray-300 mt-6">Contact Information</h5>
+            <div className="text-sm text-gray-400 mt-2 space-y-1">
+              <p>Email: <a href="mailto:promoerp786@gmail.com" className="text-indigo-400 hover:underline">promoerp786@gmail.com</a></p>
+              <p>Contact Number: +92-321-8833616</p>
+            </div>
+
+            <h5 className="font-bold text-gray-300 mt-6">Links</h5>
+            <div className="text-sm text-gray-400 mt-2 space-y-2">
+              <p><span className="font-medium text-gray-300">Website:</span> <a href="https://sites.google.com/view/promoerp/home" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline break-all">sites.google.com/view/promoerp/home</a></p>
+              <p><span className="font-medium text-gray-300">FaceBook:</span> <a href="https://facebook.com/promoerp786" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline break-all">facebook.com/promoerp786</a></p>
+              <p><span className="font-medium text-gray-300">WhatsApp:</span> <a href="https://wa.me/923218833616" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline break-all">wa.me/923218833616</a></p>
+              <p><span className="font-medium text-gray-300">YouTube:</span> <a href="https://www.youtube.com/@PromoERP" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline break-all">www.youtube.com/@PromoERP</a></p>
+            </div>
+          </div>
         </div>
       </div>
     );
