@@ -171,7 +171,11 @@ export default function SaasAdminConsole() {
     menu: (base: any) => ({
       ...base,
       fontSize: '12px',
-      zIndex: 50
+      zIndex: 9999
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 9999
     })
   };
 
@@ -239,7 +243,7 @@ export default function SaasAdminConsole() {
       </div>
 
       <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 border-b">
               <tr>
@@ -287,6 +291,8 @@ export default function SaasAdminConsole() {
                         onChange={(opt: any) => opt && updateOrgPlan(org.id, opt.value)}
                         styles={selectStyles}
                         isSearchable={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuPosition="fixed"
                       />
                     </div>
                     <button
